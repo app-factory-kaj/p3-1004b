@@ -1,0 +1,33 @@
+{
+  "name": "bookstore-webapp",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:mock": "vite --mode mock",
+    "gen": "node scripts/gen-authz.mjs",
+    "build": "npm run gen && tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "openapi-fetch": "^0.13.0",
+    "oidc-client-ts": "^3.5.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "@wso2/oxygen-ui": "^0.15.0",
+    "@wso2/oxygen-ui-icons-react": "^0.15.0",
+    "react-router-dom": "^7.18.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "msw": "^2.6.0",
+    "openapi-typescript": "^7.4.0",
+    "typescript": "~5.6.0",
+    "vite": "^6.0.0",
+    "yaml": "^2.6.0",
+    "@types/react": "^19",
+    "@types/react-dom": "^19"
+  }
+}
