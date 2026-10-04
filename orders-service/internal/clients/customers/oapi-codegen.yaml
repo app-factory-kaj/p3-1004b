@@ -1,0 +1,8 @@
+package: customersclient
+output: internal/clients/customers/client_gen.go
+generate:
+  client: true
+  models: true
+output-options:
+  name-normalizer: ToCamelCaseWithInitialisms
+  prefer-skip-optional-pointer: true

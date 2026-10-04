@@ -1,0 +1,12 @@
+package: gen
+# Relative to the directory you RUN the generator from (the App Path), not to
+# this config file. It must land in the package `package:` names, or the build
+# fails on a package/directory mismatch.
+output: internal/gen/server_gen.go
+generate:
+  chi-server: true
+  strict-server: true
+  models: true
+output-options:
+  name-normalizer: ToCamelCaseWithInitialisms
+  prefer-skip-optional-pointer: true

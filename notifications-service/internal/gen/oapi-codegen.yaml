@@ -1,0 +1,9 @@
+package: gen
+output: internal/gen/server_gen.go
+generate:
+  chi-server: true
+  strict-server: true
+  models: true
+output-options:
+  name-normalizer: ToCamelCaseWithInitialisms
+  prefer-skip-optional-pointer: true
