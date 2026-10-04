@@ -1,0 +1,4 @@
+apiVersion = "agentic-engineer/v1"
+name = "p3-1004b"
+createdAt = "2026-10-04T00:02:37Z"
+idea = "An online bookstore platform made of six separate Go microservices, each its own component with its own OpenAPI spec and its own database-free in-memory store: catalog (books CRUD and search), customers (accounts and addresses), cart (per-customer carts), orders (checkout and order history), inventory (stock levels and reservations), and notifications (order status messages). Plus a React storefront web app that uses all of them. Public is fine. No database. Follow the conventions in app-factory-kaj/e2e-reference. Include detailed requirements and acceptance criteria for every service."
