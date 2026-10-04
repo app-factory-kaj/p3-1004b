@@ -1,0 +1,551 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-04T01:11:00Z",
+  "commit": "4647318a8ee0e8e31e123d467312834ff2985a12",
+  "baseUrl": "http://http-p3-1004b-book-development-default-811efc87.openchoreoapis.localhost:19080/",
+  "isolation": "Each scenario that needed its own data created a fresh catalog book (and, where needed, a matching stock-level record, address, or order) via direct service calls under a test actor's own token, then asserted only against that freshly created entity by id/title — never against the pre-seeded 5-book catalog. Cross-shopper isolation scenarios used two distinct test accounts (test-shopper as Marco, test-shopper-two as Elena), each acting only on its own resources.",
+  "scenarios": [
+    {
+      "feature": "Shopping cart",
+      "featureFile": "specs/validation/acceptance/cart.feature",
+      "line": 6,
+      "rule": "A signed-in Shopper may add, change the quantity of, and remove books in their own cart",
+      "scenario": "Marco adds a book to his cart",
+      "tags": [],
+      "outcome": "failed",
+      "steps": [
+        { "text": "Marco is signed in as a Shopper with an empty cart", "keyword": "Given",
+          "command": "signed in via IdP as test-shopper; curl -X DELETE .../p3-1004b-cart-service-http/me/cart (direct gateway, Given-step setup)",
+          "exit": 0, "observed": "cart-service direct gateway returned 204, then GET /me/cart -> {\"items\":[],\"subtotal\":0}" },
+        { "text": "Marco adds 2 copies of \"Clean Architecture\" to his cart", "keyword": "When",
+          "command": "agent-browser open .../books/book-9 ; agent-browser click @e4 (\"Add to cart\") -- performed twice",
+          "exit": 0, "observed": "Each click fired POST http://.../api/cart-service/me/cart/items (the webapp's own API) which returned HTTP 401 {\"code\":401,\"message\":\"Unauthorized\"} both times, despite Marco being validly signed in with cart:manage scope" },
+        { "text": "Marco's cart contains 2 copies of \"Clean Architecture\"", "keyword": "Then",
+          "command": "curl -H \"Authorization: Bearer <marco>\" http://development-default.openchoreoapis.localhost:19080/p3-1004b-cart-service-http/me/cart",
+          "exit": 1, "observed": "{\"items\":[],\"subtotal\":0} -- the cart is still empty; the add never reached the cart" }
+      ],
+      "evidence": {
+        "network": [
+          { "method": "POST", "url": "http://http-p3-1004b-book-development-default-811efc87.openchoreoapis.localhost:19080/api/cart-service/me/cart/items", "status": 401 },
+          { "method": "POST", "url": "http://http-p3-1004b-book-development-default-811efc87.openchoreoapis.localhost:19080/api/cart-service/me/cart/items", "status": 401 }
+        ],
+        "console": [],
+        "snapshot": "Comparative proof the webapp's own backend-for-frontend is broken, not Marco's credentials: the identical access_token lifted from the signed-in browser session, sent directly to cart-service's own gateway path (http://development-default.openchoreoapis.localhost:19080/p3-1004b-cart-service-http/me/cart), returns 200 and a valid empty cart -- only the webapp's own /api/cart-service/* proxy rejects it with 401 on every call (read and write), for every authenticated service (cart, customers, orders, notifications). catalog-service and inventory-service writes through the same webapp proxy work normally."
+      }
+    },
+    {
+      "feature": "Shopping cart",
+      "featureFile": "specs/validation/acceptance/cart.feature",
+      "line": 11,
+      "rule": "A signed-in Shopper may add, change the quantity of, and remove books in their own cart",
+      "scenario": "Marco changes a cart item's quantity",
+      "tags": [],
+      "outcome": "blocked",
+      "steps": [
+        { "text": "Marco's cart contains 2 copies of \"Clean Architecture\"", "keyword": "Given",
+          "command": "curl -X POST -H \"Authorization: Bearer <marco>\" -d '{\"bookId\":\"book-9\",\"quantity\":2}' http://development-default.openchoreoapis.localhost:19080/p3-1004b-cart-service-http/me/cart/items",
+          "exit": 0, "observed": "{\"items\":[{\"bookId\":\"book-9\",\"quantity\":2}],...}" },
+        { "text": "Marco changes the quantity of \"Clean Architecture\" in his cart to 3", "keyword": "When",
+          "command": "agent-browser open http://http-p3-1004b-book-development-default-811efc87.openchoreoapis.localhost:19080/cart",
+          "exit": 1, "observed": "No quantity control exists to act on: the page itself redirects to /forbidden (\"Not available to you -- That screen needs a permission your account does not have\") for Marco even though he is a correctly-scoped Shopper. GET /api/cart-service/me/cart returned 401 and the cart was never rendered, so there is no stepper/input in the DOM at all." }
+      ]
+    },
+    {
+      "feature": "Shopping cart",
+      "featureFile": "specs/validation/acceptance/cart.feature",
+      "line": 16,
+      "rule": "A signed-in Shopper may add, change the quantity of, and remove books in their own cart",
+      "scenario": "Marco removes a book from his cart",
+      "tags": [],
+      "outcome": "blocked",
+      "steps": [
+        { "text": "Marco's cart contains 3 copies of \"Clean Architecture\"", "keyword": "Given",
+          "command": "(precondition from prior scenario in the same Rule; cart state is reachable only via direct API, not via UI)",
+          "exit": 0, "observed": "established directly against cart-service's own gateway" },
+        { "text": "Marco removes \"Clean Architecture\" from his cart", "keyword": "When",
+          "command": "agent-browser open http://http-p3-1004b-book-development-default-811efc87.openchoreoapis.localhost:19080/cart",
+          "exit": 1, "observed": "Same as the quantity-change scenario: /cart resolves to /forbidden for Marco, no cart contents or remove control ever render. There is no other UI surface (e.g. no remove control on the book detail page) that performs this action." }
+      ]
+    },
+    {
+      "feature": "Shopping cart",
+      "featureFile": "specs/validation/acceptance/cart.feature",
+      "line": 24,
+      "rule": "A signed-in Shopper may view their current cart contents and subtotal",
+      "scenario": "Marco reviews his cart before checkout",
+      "tags": [],
+      "outcome": "blocked",
+      "steps": [
+        { "text": "Marco's cart contains 1 copy of \"Clean Architecture\" priced at \"$29.99\"", "keyword": "Given",
+          "command": "curl -X POST -H \"Authorization: Bearer <marco>\" -d '{\"bookId\":\"book-9\",\"quantity\":1}' http://development-default.openchoreoapis.localhost:19080/p3-1004b-cart-service-http/me/cart/items",
+          "exit": 0, "observed": "{\"items\":[{\"bookId\":\"book-9\",\"quantity\":1}],\"subtotal\":1}" },
+        { "text": "Marco views his cart", "keyword": "When",
+          "command": "agent-browser open http://http-p3-1004b-book-development-default-811efc87.openchoreoapis.localhost:19080/cart",
+          "exit": 1, "observed": "resolves to /forbidden; GET /api/cart-service/me/cart -> 401. No cart UI renders at all." }
+      ]
+    },
+    {
+      "feature": "Shopping cart",
+      "featureFile": "specs/validation/acceptance/cart.feature",
+      "line": 30,
+      "rule": "A signed-in Shopper may view their current cart contents and subtotal",
+      "scenario": "A shopper cannot see another shopper's cart",
+      "tags": ["@negative"],
+      "outcome": "blocked",
+      "steps": [
+        { "text": "Marco's cart contains 1 copy of \"Clean Architecture\"", "keyword": "Given",
+          "command": "(as above, direct cart-service API)", "exit": 0, "observed": "confirmed via direct GET" },
+        { "text": "Elena is signed in as a different Shopper with an empty cart", "keyword": "Given",
+          "command": "signed in as test-shopper-two via IdP; curl -X DELETE -H \"Authorization: Bearer <elena>\" http://development-default.openchoreoapis.localhost:19080/p3-1004b-cart-service-http/me/cart",
+          "exit": 0, "observed": "204; cart confirmed empty" },
+        { "text": "Elena views her own cart", "keyword": "When",
+          "command": "agent-browser open http://http-p3-1004b-book-development-default-811efc87.openchoreoapis.localhost:19080/cart (signed in as test-shopper-two)",
+          "exit": 1, "observed": "Also resolves to /forbidden for Elena -- the same systemic defect blocks every shopper from viewing any cart, so this scenario's own isolation claim was never exercised through the app's UI (there is nothing rendered to misjudge isolation from)." }
+      ]
+    },
+    {
+      "feature": "Catalog browsing and management",
+      "featureFile": "specs/validation/acceptance/catalog.feature",
+      "line": 6,
+      "rule": "Anyone may search and browse the book catalog without signing in",
+      "scenario": "A visitor searches for a book by title",
+      "tags": [],
+      "outcome": "passed",
+      "steps": [
+        { "text": "the catalog has a book titled \"Designing Data-Intensive Applications\" by \"Martin Kleppmann\"", "keyword": "Given",
+          "command": "curl -X POST -H \"Authorization: Bearer <staff>\" -d '{\"title\":\"Designing Data-Intensive Applications\",\"author\":\"Martin Kleppmann\",\"price\":44.99}' http://.../api/books",
+          "exit": 0, "observed": "201 {\"id\":\"book-8\",...}" },
+        { "text": "a visitor who is not signed in searches the catalog for \"Data-Intensive\"", "keyword": "When",
+          "command": "agent-browser fill @e19 \"Data-Intensive\" ; agent-browser press Enter (signed out)",
+          "exit": 0 },
+        { "text": "\"Designing Data-Intensive Applications\" appears in the search results", "keyword": "Then",
+          "command": "agent-browser wait --text \"Designing Data-Intensive Applications\" --timeout 3000",
+          "exit": 0, "observed": "text found; row showed author Martin Kleppmann, $44.99" }
+      ]
+    },
+    {
+      "feature": "Catalog browsing and management",
+      "featureFile": "specs/validation/acceptance/catalog.feature",
+      "line": 11,
+      "rule": "Anyone may search and browse the book catalog without signing in",
+      "scenario": "A visitor browses the catalog without searching",
+      "tags": [],
+      "outcome": "passed",
+      "steps": [
+        { "text": "the catalog has at least one book", "keyword": "Given", "command": "(pre-existing: 5 seeded books plus books created in this run)", "exit": 0 },
+        { "text": "a visitor who is not signed in browses the catalog", "keyword": "When",
+          "command": "agent-browser open http://http-p3-1004b-book-development-default-811efc87.openchoreoapis.localhost:19080/ (signed out)",
+          "exit": 0 },
+        { "text": "the visitor sees the catalog's books", "keyword": "Then",
+          "command": "agent-browser get count \"tbody tr\"",
+          "exit": 0, "observed": "10" }
+      ]
+    },
+    {
+      "feature": "Catalog browsing and management",
+      "featureFile": "specs/validation/acceptance/catalog.feature",
+      "line": 19,
+      "rule": "Anyone may view a book's details, including stock availability",
+      "scenario": "A visitor views a book's detail page",
+      "tags": [],
+      "outcome": "passed",
+      "steps": [
+        { "text": "the catalog has a book titled \"Clean Architecture\" by \"Robert Martin\" priced at \"$29.99\"", "keyword": "Given",
+          "command": "curl -X POST -H \"Authorization: Bearer <staff>\" -d '{\"title\":\"Clean Architecture\",\"author\":\"Robert Martin\",\"price\":29.99,\"description\":\"...\"}' http://.../api/books ; curl -X PUT .../api/inventory-service/stock-levels/book-9 -d '{\"quantityOnHand\":20}'",
+          "exit": 0, "observed": "book-9 created at $29.99; stock set to 20" },
+        { "text": "a visitor who is not signed in opens \"Clean Architecture\"", "keyword": "When",
+          "command": "agent-browser open http://http-p3-1004b-book-development-default-811efc87.openchoreoapis.localhost:19080/books/book-9 (signed out)",
+          "exit": 0 },
+        { "text": "the visitor sees its title, author, description, price and stock availability", "keyword": "Then",
+          "command": "agent-browser wait --text \"Clean Architecture\" ; --text \"Robert Martin\" ; --text \"craftsman's guide\" ; --text \"$29.99\" ; --text \"In stock\" (each --timeout 3000)",
+          "exit": 0, "observed": "all five waits returned exit 0: title, author, description, price and \"In stock\" availability all rendered" }
+      ]
+    },
+    {
+      "feature": "Catalog browsing and management",
+      "featureFile": "specs/validation/acceptance/catalog.feature",
+      "line": 27,
+      "rule": "Only Store Staff may create, update or remove a book",
+      "scenario": "Store Staff adds a new book",
+      "tags": ["@story-13", "@negative"],
+      "outcome": "passed",
+      "steps": [
+        { "text": "Priya is signed in as Store Staff", "keyword": "Given", "command": "signed in via IdP as test-store-staff", "exit": 0 },
+        { "text": "Priya adds a book titled \"The Pragmatic Programmer\" by \"David Thomas\" priced at \"$34.99\"", "keyword": "When",
+          "command": "agent-browser open .../staff/catalog ; click \"Add book\" ; fill Title/Author/Price ; click \"Save book\"",
+          "exit": 0, "observed": "network showed POST http://.../api/books -> 201" },
+        { "text": "\"The Pragmatic Programmer\" appears in the catalog", "keyword": "Then",
+          "command": "curl http://.../api/books?limit=100 | grep book-7",
+          "exit": 0, "observed": "{\"author\":\"David Thomas\",\"id\":\"book-7\",\"price\":34.99,\"title\":\"The Pragmatic Programmer\"}" }
+      ]
+    },
+    {
+      "feature": "Catalog browsing and management",
+      "featureFile": "specs/validation/acceptance/catalog.feature",
+      "line": 33,
+      "rule": "Only Store Staff may create, update or remove a book",
+      "scenario": "A shopper cannot add a book",
+      "tags": ["@negative"],
+      "outcome": "passed",
+      "steps": [
+        { "text": "Marco is signed in as a Shopper", "keyword": "Given", "command": "signed in via IdP as test-shopper", "exit": 0 },
+        { "text": "Marco tries to add a book titled \"Unauthorized Entry\" by \"Nobody\"", "keyword": "When",
+          "command": "agent-browser open .../staff/catalog (route guard check) -> redirected to /forbidden (\"Staff Catalog needs the ...\" permission); no Add-book control reachable for a Shopper, so attempted via API: curl -X POST -H \"Authorization: Bearer <marco>\" -d '{\"title\":\"Unauthorized Entry\",\"author\":\"Nobody\",\"price\":9.99}' http://.../api/books",
+          "exit": 1, "observed": "{\"error\":\"Unauthorized\",\"message\":\"Authentication failed\"} HTTP 401" },
+        { "text": "the catalog still does not contain \"Unauthorized Entry\"", "keyword": "Then",
+          "command": "curl http://.../api/books?limit=100 | count title==\"Unauthorized Entry\"",
+          "exit": 0, "observed": "count: 0" }
+      ]
+    },
+    {
+      "feature": "Catalog browsing and management",
+      "featureFile": "specs/validation/acceptance/catalog.feature",
+      "line": 39,
+      "rule": "Only Store Staff may create, update or remove a book",
+      "scenario": "A visitor who is not signed in cannot remove a book",
+      "tags": ["@negative"],
+      "outcome": "passed",
+      "steps": [
+        { "text": "the catalog has a book titled \"Refactoring\" by \"Martin Fowler\"", "keyword": "Given",
+          "command": "curl -X POST -H \"Authorization: Bearer <staff>\" -d '{\"title\":\"Refactoring\",\"author\":\"Martin Fowler\",\"price\":39.99}' http://.../api/books",
+          "exit": 0, "observed": "201 {\"id\":\"book-10\",...}" },
+        { "text": "a visitor who is not signed in tries to remove \"Refactoring\"", "keyword": "When",
+          "command": "curl -X DELETE http://.../api/books/book-10 (no Authorization header; no delete control exists in the UI for a signed-out visitor)",
+          "exit": 1, "observed": "{\"error\":\"Unauthorized\",\"message\":\"Authentication failed\"} HTTP 401" },
+        { "text": "the catalog still contains \"Refactoring\"", "keyword": "Then",
+          "command": "curl http://.../api/books?limit=100 | count title==\"Refactoring\"",
+          "exit": 0, "observed": "count: 1" }
+      ]
+    },
+    {
+      "feature": "Checkout and order history",
+      "featureFile": "specs/validation/acceptance/checkout-and-orders.feature",
+      "line": 6,
+      "rule": "A signed-in Shopper may check out their cart into an order",
+      "scenario": "Marco checks out his cart",
+      "tags": [],
+      "outcome": "blocked",
+      "steps": [
+        { "text": "Marco's cart contains 1 copy of \"Clean Architecture\" and he has a saved shipping address", "keyword": "Given",
+          "command": "curl -X POST .../p3-1004b-cart-service-http/me/cart/items -d '{\"bookId\":\"book-9\",\"quantity\":1}' ; curl -X POST .../p3-1004b-customers-service-http/me/addresses -d '{\"line1\":\"1 Test St\",...}'",
+          "exit": 0, "observed": "cart has 1x book-9; address cfb8e6c078dce120 saved" },
+        { "text": "\"Clean Architecture\" is in stock", "keyword": "Given",
+          "command": "curl http://.../api/inventory-service/stock-levels/book-9", "exit": 0, "observed": "quantityOnHand:20" },
+        { "text": "Marco checks out", "keyword": "When",
+          "command": "agent-browser open http://http-p3-1004b-book-development-default-811efc87.openchoreoapis.localhost:19080/checkout and /cart",
+          "exit": 1, "observed": "both routes resolve to /forbidden for a signed-in Shopper; there is no checkout control reachable anywhere in the UI (the cart page that would host it never renders, per the cart.feature findings above)" }
+      ]
+    },
+    {
+      "feature": "Checkout and order history",
+      "featureFile": "specs/validation/acceptance/checkout-and-orders.feature",
+      "line": 16,
+      "rule": "Checkout refuses when an item in the cart is no longer in stock",
+      "scenario": "An out-of-stock item blocks checkout",
+      "tags": ["@negative"],
+      "outcome": "passed",
+      "steps": [
+        { "text": "Marco's cart contains 1 copy of \"Designing Data-Intensive Applications\" and he has a saved shipping address", "keyword": "Given",
+          "command": "curl -X POST .../p3-1004b-cart-service-http/me/cart/items -d '{\"bookId\":\"book-8\",\"quantity\":1}'",
+          "exit": 0, "observed": "cart has 1x book-8; address cfb8e6c078dce120 already saved" },
+        { "text": "\"Designing Data-Intensive Applications\" has zero stock remaining", "keyword": "Given",
+          "command": "curl -X PUT .../api/inventory-service/stock-levels/book-8 -d '{\"quantityOnHand\":0}'",
+          "exit": 0, "observed": "{\"quantityOnHand\":0,...}" },
+        { "text": "Marco tries to check out", "keyword": "When",
+          "command": "No checkout control is reachable via the UI (/checkout and /cart both resolve to /forbidden for every Shopper -- see checkout success scenario above), so attempted against orders-service's own documented gateway endpoint: curl -X POST -H \"Authorization: Bearer <marco>\" -d '{\"addressId\":\"cfb8e6c078dce120\",\"paymentMethodRef\":\"test-payment\"}' http://development-default.openchoreoapis.localhost:19080/p3-1004b-orders-service-http/me/orders",
+          "exit": 1, "observed": "HTTP 400 {\"code\":400,\"message\":\"insufficient stock for this book\"} -- a status that names the rule, not a bare 401, so this settles the refusal" },
+        { "text": "no new order is placed for Marco", "keyword": "Then",
+          "command": "curl -H \"Authorization: Bearer <marco>\" http://.../p3-1004b-orders-service-http/me/orders",
+          "exit": 0, "observed": "order list unchanged (count stayed at whatever it was before this attempt; no order referencing book-8 exists)" },
+        { "text": "Marco's cart still contains \"Designing Data-Intensive Applications\"", "keyword": "Then",
+          "command": "curl -H \"Authorization: Bearer <marco>\" http://.../p3-1004b-cart-service-http/me/cart",
+          "exit": 0, "observed": "{\"items\":[{\"bookId\":\"book-8\",\"quantity\":1}],...} -- item still present" }
+      ]
+    },
+    {
+      "feature": "Checkout and order history",
+      "featureFile": "specs/validation/acceptance/checkout-and-orders.feature",
+      "line": 26,
+      "rule": "A signed-in Shopper may view their own past orders",
+      "scenario": "Marco views his order history",
+      "tags": [],
+      "outcome": "blocked",
+      "steps": [
+        { "text": "Marco has a past order for \"Clean Architecture\"", "keyword": "Given",
+          "command": "curl -X POST .../p3-1004b-cart-service-http/me/cart/items -d '{\"bookId\":\"book-9\",\"quantity\":1}' ; curl -X POST .../p3-1004b-orders-service-http/me/orders -d '{\"addressId\":\"cfb8e6c078dce120\",\"paymentMethodRef\":\"test-payment\"}'",
+          "exit": 0, "observed": "order order_1791076215902489786_33c18647c175d443 created, status placed" },
+        { "text": "Marco opens his order history", "keyword": "When",
+          "command": "agent-browser open http://http-p3-1004b-book-development-default-811efc87.openchoreoapis.localhost:19080/orders",
+          "exit": 1, "observed": "resolves to /forbidden; GET /api/orders-service/me/orders -> 401. No order list ever renders, even though the order genuinely exists (confirmed directly against orders-service)." }
+      ]
+    },
+    {
+      "feature": "Checkout and order history",
+      "featureFile": "specs/validation/acceptance/checkout-and-orders.feature",
+      "line": 32,
+      "rule": "A signed-in Shopper may view their own past orders",
+      "scenario": "A shopper cannot see another shopper's orders",
+      "tags": ["@negative"],
+      "outcome": "blocked",
+      "steps": [
+        { "text": "Marco has a past order for \"Clean Architecture\"", "keyword": "Given", "command": "(as above)", "exit": 0 },
+        { "text": "Elena is signed in as a different Shopper with no past orders", "keyword": "Given",
+          "command": "curl -H \"Authorization: Bearer <elena>\" http://.../p3-1004b-orders-service-http/me/orders", "exit": 0, "observed": "{\"count\":0,\"data\":[]}" },
+        { "text": "Elena opens her own order history", "keyword": "When",
+          "command": "agent-browser open http://http-p3-1004b-book-development-default-811efc87.openchoreoapis.localhost:19080/orders (signed in as test-shopper-two)",
+          "exit": 1, "observed": "resolves to /forbidden for Elena too -- same systemic defect; the order-history view never renders for any shopper, so this scenario's isolation claim was never exercised through the UI" }
+      ]
+    },
+    {
+      "feature": "Checkout and order history",
+      "featureFile": "specs/validation/acceptance/checkout-and-orders.feature",
+      "line": 41,
+      "rule": "A signed-in Shopper may view the current status of each of their orders",
+      "scenario": "Marco checks an order's status",
+      "tags": [],
+      "outcome": "blocked",
+      "steps": [
+        { "text": "Marco placed an order that is now \"shipped\"", "keyword": "Given",
+          "command": "reviewed orders-service's full OpenAPI contract (GET /me/orders, POST /me/orders, GET /me/orders/{id}) and design.json for any status-transition endpoint",
+          "exit": 1, "observed": "No endpoint, staff UI, or documented background job exists anywhere in the deployed system to move an order out of its initial \"placed\" status. An order can only ever be observed as \"placed\" immediately after checkout. This precondition cannot be reached at any interface." }
+      ]
+    },
+    {
+      "feature": "Customer accounts and addresses",
+      "featureFile": "specs/validation/acceptance/customer-accounts.feature",
+      "line": 6,
+      "rule": "A signed-in Shopper may create an account profile",
+      "scenario": "Marco sets up his profile",
+      "tags": [],
+      "outcome": "blocked",
+      "steps": [
+        { "text": "Marco is signed in as a Shopper for the first time", "keyword": "Given", "command": "signed in via IdP as test-shopper", "exit": 0 },
+        { "text": "Marco saves his profile with name \"Marco Diaz\" and email \"marco@example.com\"", "keyword": "When",
+          "command": "agent-browser open http://http-p3-1004b-book-development-default-811efc87.openchoreoapis.localhost:19080/account",
+          "exit": 1, "observed": "resolves to /forbidden (\"Not available to you\"); GET /api/customers-service/me/profile -> 401 and /api/customers-service/me/addresses -> 401. No profile form ever renders." }
+      ]
+    },
+    {
+      "feature": "Customer accounts and addresses",
+      "featureFile": "specs/validation/acceptance/customer-accounts.feature",
+      "line": 15,
+      "rule": "Only a signed-in Shopper may manage their account",
+      "scenario": "A visitor who is not signed in cannot view a profile",
+      "tags": ["@negative"],
+      "outcome": "passed",
+      "steps": [
+        { "text": "a visitor who is not signed in tries to open the account page", "keyword": "When",
+          "command": "agent-browser open http://http-p3-1004b-book-development-default-811efc87.openchoreoapis.localhost:19080/account (signed out)",
+          "exit": 0 },
+        { "text": "the visitor is sent to sign in", "keyword": "Then",
+          "command": "agent-browser get url",
+          "exit": 0, "observed": "http://development-idp.openchoreo.localhost:8080/gate/signin?showInsecureWarning=true" }
+      ]
+    },
+    {
+      "feature": "Customer accounts and addresses",
+      "featureFile": "specs/validation/acceptance/customer-accounts.feature",
+      "line": 22,
+      "rule": "A signed-in Shopper may manage their own shipping addresses",
+      "scenario": "Marco adds a shipping address",
+      "tags": [],
+      "outcome": "blocked",
+      "steps": [
+        { "text": "Marco is signed in as a Shopper", "keyword": "Given", "command": "signed in via IdP as test-shopper", "exit": 0 },
+        { "text": "Marco adds a shipping address at \"221B Baker Street, London\"", "keyword": "When",
+          "command": "agent-browser open http://http-p3-1004b-book-development-default-811efc87.openchoreoapis.localhost:19080/account (and /addresses, /account/addresses)",
+          "exit": 1, "observed": "all three routes resolve to /forbidden; no address form is reachable for a signed-in Shopper" }
+      ]
+    },
+    {
+      "feature": "Customer accounts and addresses",
+      "featureFile": "specs/validation/acceptance/customer-accounts.feature",
+      "line": 27,
+      "rule": "A signed-in Shopper may manage their own shipping addresses",
+      "scenario": "Marco edits an existing address",
+      "tags": [],
+      "outcome": "blocked",
+      "steps": [
+        { "text": "Marco has a saved address at \"221B Baker Street, London\"", "keyword": "Given",
+          "command": "curl -X POST -H \"Authorization: Bearer <marco>\" -d '{\"line1\":\"221B Baker Street\",\"city\":\"London\",...}' http://.../p3-1004b-customers-service-http/me/addresses",
+          "exit": 0, "observed": "address created directly (the only reachable interface)" },
+        { "text": "Marco edits that address to \"10 Downing Street, London\"", "keyword": "When",
+          "command": "agent-browser open http://http-p3-1004b-book-development-default-811efc87.openchoreoapis.localhost:19080/account",
+          "exit": 1, "observed": "/forbidden -- no address list or edit control ever renders" }
+      ]
+    },
+    {
+      "feature": "Customer accounts and addresses",
+      "featureFile": "specs/validation/acceptance/customer-accounts.feature",
+      "line": 32,
+      "rule": "A signed-in Shopper may manage their own shipping addresses",
+      "scenario": "Marco removes an address",
+      "tags": [],
+      "outcome": "blocked",
+      "steps": [
+        { "text": "Marco has a saved address at \"10 Downing Street, London\"", "keyword": "Given", "command": "(continuation of the prior scenario's precondition)", "exit": 0 },
+        { "text": "Marco removes that address", "keyword": "When",
+          "command": "agent-browser open http://http-p3-1004b-book-development-default-811efc87.openchoreoapis.localhost:19080/account",
+          "exit": 1, "observed": "/forbidden -- no remove control ever renders" }
+      ]
+    },
+    {
+      "feature": "Customer accounts and addresses",
+      "featureFile": "specs/validation/acceptance/customer-accounts.feature",
+      "line": 38,
+      "rule": "A signed-in Shopper may manage their own shipping addresses",
+      "scenario": "A shopper cannot see another shopper's addresses",
+      "tags": ["@negative"],
+      "outcome": "blocked",
+      "steps": [
+        { "text": "Marco has a saved address at \"221B Baker Street, London\"", "keyword": "Given", "command": "(as above, direct customers-service API)", "exit": 0 },
+        { "text": "Elena is signed in as a different Shopper", "keyword": "Given", "command": "signed in via IdP as test-shopper-two", "exit": 0 },
+        { "text": "Elena views her own saved addresses", "keyword": "When",
+          "command": "agent-browser open http://http-p3-1004b-book-development-default-811efc87.openchoreoapis.localhost:19080/account (signed in as test-shopper-two)",
+          "exit": 1, "observed": "/forbidden for Elena too -- same systemic defect; no addresses view renders for any shopper" }
+      ]
+    },
+    {
+      "feature": "Stock levels and reservations",
+      "featureFile": "specs/validation/acceptance/inventory.feature",
+      "line": 6,
+      "rule": "Only Store Staff may adjust a book's stock level",
+      "scenario": "Store Staff restocks a book",
+      "tags": [],
+      "outcome": "passed",
+      "steps": [
+        { "text": "\"The Go Programming Language\" has 10 units on hand", "keyword": "Given",
+          "command": "curl -X POST -H \"Authorization: Bearer <staff>\" -d '{\"title\":\"The Go Programming Language\",\"author\":\"Alan Donovan\",\"price\":39.99}' http://.../api/books ; curl -X PUT http://.../api/inventory-service/stock-levels/book-11 -d '{\"quantityOnHand\":10}'",
+          "exit": 0, "observed": "book-11 created; stock set to {\"quantityOnHand\":10,...}" },
+        { "text": "Priya is signed in as Store Staff", "keyword": "Given", "command": "signed in via IdP as test-store-staff", "exit": 0 },
+        { "text": "Priya sets the on-hand quantity of \"The Go Programming Language\" to 25", "keyword": "When",
+          "command": "agent-browser open .../staff/inventory/book-11 ; fill \"On-hand quantity\" 25 ; click \"Save\"",
+          "exit": 0, "observed": "network: PUT http://.../api/inventory-service/stock-levels/book-11 -> 200" },
+        { "text": "\"The Go Programming Language\" shows 25 units on hand", "keyword": "Then",
+          "command": "agent-browser wait --text \"25\" --timeout 3000 (on the Stock Levels list)",
+          "exit": 0, "observed": "\"25\" present in the row for The Go Programming Language" }
+      ]
+    },
+    {
+      "feature": "Stock levels and reservations",
+      "featureFile": "specs/validation/acceptance/inventory.feature",
+      "line": 13,
+      "rule": "Only Store Staff may adjust a book's stock level",
+      "scenario": "A shopper cannot adjust stock",
+      "tags": ["@negative"],
+      "outcome": "failed",
+      "steps": [
+        { "text": "\"The Go Programming Language\" has 25 units on hand", "keyword": "Given", "command": "(continuation of prior scenario)", "exit": 0, "observed": "confirmed 25 via GET http://.../api/inventory-service/stock-levels/book-11" },
+        { "text": "Marco is signed in as a Shopper", "keyword": "Given", "command": "signed in via IdP as test-shopper", "exit": 0 },
+        { "text": "Marco tries to set the on-hand quantity of \"The Go Programming Language\" to 1000", "keyword": "When",
+          "command": "agent-browser open .../staff/inventory (route guard check) -> redirected to /forbidden for Marco; no stock-adjust control reachable, so attempted against the webapp's own API: curl -X PUT -H \"Authorization: Bearer <marco>\" -d '{\"quantityOnHand\":1000}' http://.../api/inventory-service/stock-levels/book-11",
+          "exit": 0, "observed": "HTTP 200 {\"bookId\":\"book-11\",\"quantityOnHand\":1000,\"quantityReserved\":0} -- the write SUCCEEDED despite Marco holding no stock:manage scope" },
+        { "text": "\"The Go Programming Language\" still shows 25 units on hand", "keyword": "Then",
+          "command": "curl http://.../api/inventory-service/stock-levels/book-11",
+          "exit": 1, "observed": "{\"quantityOnHand\":1000,...} -- the quantity was changed, not held at 25" }
+      ],
+      "evidence": {
+        "network": [
+          { "method": "PUT", "url": "http://http-p3-1004b-book-development-default-811efc87.openchoreoapis.localhost:19080/api/inventory-service/stock-levels/book-11", "status": 200 }
+        ],
+        "console": [],
+        "snapshot": "Follow-up probe confirmed this endpoint enforces no authentication or authorization at all: a PUT with NO Authorization header whatsoever also succeeded and changed the same book's stock (5 -> 999 in an earlier probe against book-7). This is a broken-access-control defect (OWASP A01), not merely a scope-check gap -- anyone, signed in or not, can rewrite any book's on-hand quantity through the webapp's exposed API."
+      }
+    },
+    {
+      "feature": "Stock levels and reservations",
+      "featureFile": "specs/validation/acceptance/inventory.feature",
+      "line": 22,
+      "rule": "Only Store Staff may view which stock is currently reserved against in-flight orders",
+      "scenario": "Store Staff reviews reservations",
+      "tags": [],
+      "outcome": "passed",
+      "steps": [
+        { "text": "an order holds a reservation for 1 copy of \"Clean Architecture\"", "keyword": "Given",
+          "command": "curl -X POST -H \"Authorization: Bearer <marco>\" -d '{\"bookId\":\"book-9\",\"orderId\":\"order-test-reservation-1\",\"quantity\":1}' http://development-default.openchoreoapis.localhost:19080/p3-1004b-inventory-service-http/reservations",
+          "exit": 0, "observed": "{\"id\":\"res-000001\",\"bookId\":\"book-9\",\"quantity\":1,\"status\":\"held\",...}" },
+        { "text": "Priya is signed in as Store Staff", "keyword": "Given", "command": "signed in via IdP as test-store-staff", "exit": 0 },
+        { "text": "Priya views current reservations", "keyword": "When",
+          "command": "agent-browser open .../staff/inventory",
+          "exit": 0 },
+        { "text": "she sees the reservation for 1 copy of \"Clean Architecture\"", "keyword": "Then",
+          "command": "agent-browser wait --text \"order-test-reservation-1\" --timeout 3000 ; agent-browser get text @e48 ; agent-browser get text @e49",
+          "exit": 0, "observed": "reservation row present: Book=\"Clean Architecture\", Quantity=\"1\", Status=\"held\"" }
+      ]
+    },
+    {
+      "feature": "Stock levels and reservations",
+      "featureFile": "specs/validation/acceptance/inventory.feature",
+      "line": 29,
+      "rule": "Only Store Staff may view which stock is currently reserved against in-flight orders",
+      "scenario": "A shopper cannot view every reservation",
+      "tags": ["@negative"],
+      "outcome": "failed",
+      "steps": [
+        { "text": "an order holds a reservation for 1 copy of \"Clean Architecture\"", "keyword": "Given", "command": "(as above)", "exit": 0 },
+        { "text": "Marco is signed in as a Shopper", "keyword": "Given", "command": "signed in via IdP as test-shopper", "exit": 0 },
+        { "text": "Marco tries to view every current reservation", "keyword": "When",
+          "command": "/staff/inventory route guard redirects Marco to /forbidden; no reservations view reachable, so attempted against the webapp's own API: curl -H \"Authorization: Bearer <marco>\" http://.../api/inventory-service/reservations",
+          "exit": 0, "observed": "HTTP 200 {\"count\":1,\"data\":[{\"bookId\":\"book-9\",\"id\":\"res-000001\",\"orderId\":\"order-test-reservation-1\",\"quantity\":1,\"status\":\"held\"}]} -- the full reservation list was returned, not refused" },
+        { "text": "Marco is refused", "keyword": "Then",
+          "command": "(same response as above)",
+          "exit": 1, "observed": "Marco received the complete, unfiltered reservations list with HTTP 200 -- he was not refused" }
+      ],
+      "evidence": {
+        "network": [
+          { "method": "GET", "url": "http://http-p3-1004b-book-development-default-811efc87.openchoreoapis.localhost:19080/api/inventory-service/reservations", "status": 200 }
+        ],
+        "console": [],
+        "snapshot": "Same broken-access-control defect as the stock-adjust scenario: the webapp's /api/inventory-service/* surface performs no scope check, so stock:view-reservations is not enforced."
+      }
+    },
+    {
+      "feature": "Order-status notifications",
+      "featureFile": "specs/validation/acceptance/notifications.feature",
+      "line": 6,
+      "rule": "A signed-in Shopper sees notifications about changes to their own order status",
+      "scenario": "Marco is notified when his order is placed",
+      "tags": [],
+      "outcome": "blocked",
+      "steps": [
+        { "text": "Marco just placed a new order", "keyword": "Given",
+          "command": "curl -X POST .../p3-1004b-cart-service-http/me/cart/items -d '{\"bookId\":\"book-9\",\"quantity\":1}' ; curl -X POST .../p3-1004b-orders-service-http/me/orders -d '{\"addressId\":\"cfb8e6c078dce120\",\"paymentMethodRef\":\"test-payment\"}'",
+          "exit": 0, "observed": "order placed; GET .../p3-1004b-notifications-service-http/me/notifications confirms a notification {\"message\":\"Your order has been placed.\",\"orderId\":\"order_...\",\"read\":false} was created by the backend" },
+        { "text": "Marco opens his notifications", "keyword": "When",
+          "command": "agent-browser open http://http-p3-1004b-book-development-default-811efc87.openchoreoapis.localhost:19080/notifications",
+          "exit": 1, "observed": "resolves to /forbidden; GET /api/notifications-service/me/notifications -> 401. The notification genuinely exists (confirmed directly against notifications-service) but never renders in the UI." }
+      ]
+    },
+    {
+      "feature": "Order-status notifications",
+      "featureFile": "specs/validation/acceptance/notifications.feature",
+      "line": 11,
+      "rule": "A signed-in Shopper sees notifications about changes to their own order status",
+      "scenario": "Marco is notified when his order ships",
+      "tags": [],
+      "outcome": "blocked",
+      "steps": [
+        { "text": "Marco has a past order that just changed status to \"shipped\"", "keyword": "Given",
+          "command": "reviewed orders-service's full OpenAPI contract and design.json for a status-transition path",
+          "exit": 1, "observed": "No endpoint, staff UI, or background job exists anywhere in the deployed system to move an order's status to \"shipped\" (same gap as checkout-and-orders.feature line 41). This precondition cannot be reached at any interface, so the notification it would trigger can never be produced either." }
+      ]
+    },
+    {
+      "feature": "Order-status notifications",
+      "featureFile": "specs/validation/acceptance/notifications.feature",
+      "line": 17,
+      "rule": "A signed-in Shopper sees notifications about changes to their own order status",
+      "scenario": "A shopper cannot see another shopper's notifications",
+      "tags": ["@negative"],
+      "outcome": "blocked",
+      "steps": [
+        { "text": "Marco just placed a new order", "keyword": "Given", "command": "(as above)", "exit": 0 },
+        { "text": "Elena is signed in as a different Shopper with no orders", "keyword": "Given",
+          "command": "curl -H \"Authorization: Bearer <elena>\" http://.../p3-1004b-notifications-service-http/me/notifications", "exit": 0, "observed": "{\"count\":0,\"data\":[]}" },
+        { "text": "Elena opens her own notifications", "keyword": "When",
+          "command": "agent-browser open http://http-p3-1004b-book-development-default-811efc87.openchoreoapis.localhost:19080/notifications (signed in as test-shopper-two)",
+          "exit": 1, "observed": "/forbidden for Elena too -- same systemic defect; no notifications view renders for any shopper, so this isolation claim was never exercised through the UI" }
+      ]
+    }
+  ]
+}
