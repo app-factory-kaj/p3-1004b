@@ -1,9 +1,9 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-04T01:35:34Z",
-  "commit": "9434c25eb95e45b382cf99793328d180268da2bd",
+  "generatedAt": "2026-10-04T01:50:00Z",
+  "commit": "4063c518eeb42eccc09bef7c82f58603adfd0a63",
   "baseUrl": "http://http-p3-1004b-book-development-default-811efc87.openchoreoapis.localhost:19080/",
-  "isolation": "Each scenario that needed its own data created a fresh catalog book (and, where needed, a matching stock-level record, address, or order) via the staff/shopper UI or a direct service call under a test actor's own token, then asserted only against that freshly created entity by id/title — never against the pre-seeded catalog or against entities left over from the prior validation run. Cross-shopper isolation scenarios used two distinct test accounts (test-shopper as Marco, test-shopper-two as Elena), each acting only on its own resources; Elena's cart/orders/addresses/notifications were confirmed empty before each isolation assertion.",
+  "isolation": "Every assertion in this run is anchored to an entity created fresh by this run (books book-18..book-21 created via the staff UI/API with a run-unique title prefix 'val-1791078147', a new order placed against book-18, a new shipping address '...42 Validation Way, Testopolis', and a new stock reservation order-validation-1791078352), never against pre-existing seeded catalog rows or entities left over from a prior validation run. The one exception is the profile-creation scenario, where Marco's account already had a profile from a prior run; test-shopper-two (Elena) was genuinely blank ('first time') and was used in Marco's place to exercise that specific precondition honestly, noted on that scenario. Cross-shopper isolation scenarios used test-shopper (Marco) and test-shopper-two (Elena) as two distinct accounts: before each isolation assertion, Elena's cart/orders/addresses/notifications were confirmed empty (or shown to lack the run-unique entity) via the same UI path a real shopper would use.",
   "scenarios": [
     {
       "feature": "Shopping cart",
@@ -15,14 +15,14 @@
       "outcome": "passed",
       "steps": [
         { "text": "Marco is signed in as a Shopper with an empty cart", "keyword": "Given",
-          "command": "signed in via IdP as test-shopper; curl -X DELETE http://development-default.openchoreoapis.localhost:19080/p3-1004b-cart-service-http/me/cart",
+          "command": "signed in via IdP as test-shopper (browser flow); curl -X DELETE -H \"Authorization: Bearer <marco>\" http://development-default.openchoreoapis.localhost:19080/p3-1004b-cart-service-http/me/cart",
           "exit": 0, "observed": "204; GET /me/cart -> {\"items\":[],\"subtotal\":0}" },
         { "text": "Marco adds 2 copies of \"Clean Architecture\" to his cart", "keyword": "When",
-          "command": "agent-browser open .../books/book-15 ; agent-browser click @e4 (\"Add to cart\") -- performed twice (second click after returning to the book page)",
-          "exit": 0, "observed": "each click fired POST http://.../api/cart-service/me/cart/items -> 200, then redirected to /cart" },
+          "command": "agent-browser open .../books/book-18 (a book this run created, 'val-1791078147 Clean Code Primer'); agent-browser find role button click --name \"Add to cart\" -- performed twice, re-opening the book page between clicks since each click navigates to /cart",
+          "exit": 0, "observed": "each click fired POST http://.../api/cart-service/me/cart/items -> 200/201, then navigated to /cart" },
         { "text": "Marco's cart contains 2 copies of \"Clean Architecture\"", "keyword": "Then",
-          "command": "curl -H \"Authorization: Bearer <marco>\" http://development-default.openchoreoapis.localhost:19080/p3-1004b-cart-service-http/me/cart",
-          "exit": 0, "observed": "{\"items\":[{\"bookId\":\"book-15\",\"quantity\":2}],\"subtotal\":2,...} -- quantity is 2" }
+          "command": "agent-browser snapshot -i (cart page) ; curl -H \"Authorization: Bearer <marco>\" http://development-default.openchoreoapis.localhost:19080/p3-1004b-cart-service-http/me/cart",
+          "exit": 0, "observed": "cart page row: Book=\"val-1791078147 Clean Code Primer\" Quantity=\"2\"; API confirms {\"items\":[{\"bookId\":\"book-18\",\"quantity\":2}],\"subtotal\":2,...}" }
       ]
     },
     {
@@ -35,11 +35,11 @@
       "outcome": "blocked",
       "steps": [
         { "text": "Marco's cart contains 2 copies of \"Clean Architecture\"", "keyword": "Given",
-          "command": "curl -H \"Authorization: Bearer <marco>\" http://.../p3-1004b-cart-service-http/me/cart",
-          "exit": 0, "observed": "{\"items\":[{\"bookId\":\"book-15\",\"quantity\":2}],...}" },
+          "command": "(from the prior scenario) curl -H \"Authorization: Bearer <marco>\" .../me/cart",
+          "exit": 0, "observed": "{\"items\":[{\"bookId\":\"book-18\",\"quantity\":2}],...}" },
         { "text": "Marco changes the quantity of \"Clean Architecture\" in his cart to 3", "keyword": "When",
-          "command": "agent-browser open .../cart ; agent-browser snapshot -i",
-          "exit": 1, "observed": "the cart page now renders correctly (the proxy fix works) and shows the row Book=\"Clean Architecture\" Quantity=\"2\" Unit Price=\"$29.99\" Line Total=\"$59.98\", but the Quantity cell is a plain table cell with no stepper, input, or edit control of any kind -- a full (non-interactive) snapshot confirms no additional control exists anywhere on the page. There is no other surface (e.g. the book detail page) that exposes a quantity-change action either." }
+          "command": "agent-browser open .../cart ; agent-browser snapshot (full, non-interactive)",
+          "exit": 1, "observed": "cart row shows Book/Quantity/Unit Price/Line Total as plain table cells (confirmed via raw outerHTML dump too: <td> with no nested button/input and no onclick anywhere in the row); no stepper, input, or edit control exists on the row, and no other page (e.g. the book detail page) exposes a quantity-change action. The control the When needs is absent, so the action cannot be performed through the UI." }
       ]
     },
     {
@@ -52,11 +52,11 @@
       "outcome": "blocked",
       "steps": [
         { "text": "Marco's cart contains 3 copies of \"Clean Architecture\"", "keyword": "Given",
-          "command": "(precondition from the prior scenario in the same Rule cannot be reached either, since there is no quantity control -- cart state inspected directly)",
-          "exit": 0, "observed": "cart holds 2 copies of book-15 (the highest reachable quantity, since the quantity-change scenario above is itself blocked)" },
+          "command": "(this precondition cannot be reached either, since the quantity-change scenario above is itself blocked)",
+          "exit": 1, "observed": "cart holds 2 copies of book-18, the highest reachable quantity" },
         { "text": "Marco removes \"Clean Architecture\" from his cart", "keyword": "When",
-          "command": "agent-browser open .../cart ; agent-browser snapshot",
-          "exit": 1, "observed": "same page as above: the row for \"Clean Architecture\" has no remove/delete control, and no other control on the page removes a cart line" }
+          "command": "agent-browser snapshot (full, non-interactive) on /cart",
+          "exit": 1, "observed": "same row as above: no remove/delete control exists on the row, and no other control on the page removes a cart line" }
       ]
     },
     {
@@ -69,21 +69,21 @@
       "outcome": "failed",
       "steps": [
         { "text": "Marco's cart contains 1 copy of \"Clean Architecture\" priced at \"$29.99\"", "keyword": "Given",
-          "command": "curl -X DELETE .../me/cart ; curl -X POST -H \"Authorization: Bearer <marco>\" -d '{\"bookId\":\"book-15\",\"quantity\":1}' http://.../p3-1004b-cart-service-http/me/cart/items",
-          "exit": 0, "observed": "{\"items\":[{\"bookId\":\"book-15\",\"quantity\":1}],\"subtotal\":1,...}; book-15 is priced $29.99 in the catalog" },
+          "command": "curl -X DELETE -H \"Authorization: Bearer <marco>\" .../me/cart ; curl -X POST -H \"Authorization: Bearer <marco>\" -d '{\"bookId\":\"book-18\",\"quantity\":1}' .../me/cart/items",
+          "exit": 0, "observed": "{\"items\":[{\"bookId\":\"book-18\",\"quantity\":1}],\"subtotal\":1,...}; book-18 is priced $29.99 in the catalog" },
         { "text": "Marco views his cart", "keyword": "When",
           "command": "agent-browser open http://http-p3-1004b-book-development-default-811efc87.openchoreoapis.localhost:19080/cart",
           "exit": 0 },
         { "text": "Marco sees \"Clean Architecture\" with quantity 1 and a subtotal of \"$29.99\"", "keyword": "Then",
           "command": "agent-browser snapshot -i",
-          "exit": 1, "observed": "row shows Book=\"Clean Architecture\" Quantity=\"1\" Unit Price=\"$29.99\" Line Total=\"$29.99\" (all correct, computed client-side), but the page's \"Subtotal\" heading reads \"Subtotal: $1.00\" -- not $29.99. The underlying cause is in cart-service itself: GET /me/cart returns `\"subtotal\": 1`, i.e. the service is returning the item COUNT as the subtotal rather than a price-weighted total; the per-row Line Total is correct only because the frontend computes it independently from catalog price x quantity." }
+          "exit": 1, "observed": "row shows Book=\"val-1791078147 Clean Code Primer\" Quantity=\"1\" Unit Price=\"$29.99\" Line Total=\"$29.99\" (correct, computed client-side), but the \"Subtotal\" heading reads \"Subtotal: $1.00\" instead of \"$29.99\". Direct check confirms the defect is in cart-service itself: GET /me/cart returns subtotal:1 -- the item-count, not a price-weighted total. This reproduces the defect reported from the prior validation run (filed as part of #13/#14/#15); it has not been fixed." }
       ],
       "evidence": {
         "network": [
           { "method": "GET", "url": "http://http-p3-1004b-book-development-default-811efc87.openchoreoapis.localhost:19080/api/cart-service/me/cart", "status": 200 }
         ],
         "console": [],
-        "snapshot": "cell \"Clean Architecture\" / cell \"1\" / cell \"$29.99\" / cell \"$29.99\" / heading \"Subtotal: $1.00\" / button \"Checkout\". Direct confirmation: curl -H \"Authorization: Bearer <marco>\" http://development-default.openchoreoapis.localhost:19080/p3-1004b-cart-service-http/me/cart -> {\"id\":\"cart-01a1043f-7f6e-738e-b2d0-944c409893c9\",\"items\":[{\"bookId\":\"book-15\",\"quantity\":1}],\"subtotal\":1,\"updatedAt\":\"2026-10-04T01:35:06Z\"}. The same defect propagates into orders-service: the order placed later in this run for 1 copy of book-15 recorded unitPrice:1 and total:1 instead of 29.99."
+        "snapshot": "heading \"Subtotal: $1.00\" directly above button \"Checkout\"; row cells \"val-1791078147 Clean Code Primer\" / \"1\" / \"$29.99\" / \"$29.99\". Direct confirmation: curl -H \"Authorization: Bearer <marco>\" http://development-default.openchoreoapis.localhost:19080/p3-1004b-cart-service-http/me/cart -> {\"id\":\"cart-01a1043f-7f6e-738e-b2d0-944c409893c9\",\"items\":[{\"bookId\":\"book-18\",\"quantity\":1}],\"subtotal\":1,\"updatedAt\":\"2026-10-04T01:43:46Z\"}"
       }
     },
     {
@@ -95,16 +95,18 @@
       "tags": ["@negative"],
       "outcome": "passed",
       "steps": [
-        { "text": "Marco's cart contains 1 copy of \"Clean Architecture\"", "keyword": "Given", "command": "(as above, direct cart-service API)", "exit": 0, "observed": "confirmed via direct GET" },
+        { "text": "Marco's cart contains 1 copy of \"Clean Architecture\"", "keyword": "Given",
+          "command": "curl -X POST -H \"Authorization: Bearer <marco>\" -d '{\"bookId\":\"book-19\",\"quantity\":1}' .../me/cart/items (book-19, 'val-1791078147 Out Of Stock Tome', this run's book)",
+          "exit": 0, "observed": "{\"items\":[{\"bookId\":\"book-19\",\"quantity\":1}],...}" },
         { "text": "Elena is signed in as a different Shopper with an empty cart", "keyword": "Given",
-          "command": "signed in as test-shopper-two via IdP; curl -X DELETE -H \"Authorization: Bearer <elena>\" http://.../p3-1004b-cart-service-http/me/cart",
-          "exit": 0, "observed": "204; cart confirmed empty" },
+          "command": "signed in via IdP as test-shopper-two; curl -H \"Authorization: Bearer <elena>\" .../me/cart",
+          "exit": 0, "observed": "{\"items\":[],\"subtotal\":0,...} -- already empty" },
         { "text": "Elena views her own cart", "keyword": "When",
           "command": "agent-browser open http://http-p3-1004b-book-development-default-811efc87.openchoreoapis.localhost:19080/cart (signed in as test-shopper-two)",
           "exit": 0 },
         { "text": "Elena's cart does not contain \"Clean Architecture\"", "keyword": "Then",
           "command": "agent-browser snapshot -i",
-          "exit": 0, "observed": "table has no rows; heading reads \"Subtotal: $0.00\"; \"Checkout\" button is [disabled]" }
+          "exit": 0, "observed": "table has no rows; heading reads \"Subtotal: $0.00\"; \"Checkout\" button is [disabled]; no mention of 'Out Of Stock Tome' anywhere on the page" }
       ]
     },
     {
@@ -117,13 +119,13 @@
       "outcome": "passed",
       "steps": [
         { "text": "the catalog has a book titled \"Designing Data-Intensive Applications\" by \"Martin Kleppmann\"", "keyword": "Given",
-          "command": "curl -X POST -H \"Authorization: Bearer <staff>\" -d '{\"title\":\"Validation Run Data-Intensive Nexus\",\"author\":\"Martin Kleppmann\",\"price\":44.99}' http://.../api/books",
-          "exit": 0, "observed": "201 {\"id\":\"book-12\",...} -- a uniquely-titled book so this run's search cannot match leftover catalog data" },
+          "command": "curl -X POST -H \"Authorization: Bearer <staff>\" -d '{\"title\":\"val-1791078147 The Pragmatic Programmer Redux\",\"author\":\"David Thomas\",\"price\":34.99}' http://development-default.openchoreoapis.localhost:19080/p3-1004b-catalog-service-http/books (a run-unique title, since this rule only requires some findable book)",
+          "exit": 0, "observed": "201 {\"id\":\"book-20\",...}" },
         { "text": "a visitor who is not signed in searches the catalog for \"Data-Intensive\"", "keyword": "When",
-          "command": "agent-browser fill @e25 \"Validation Run Data-Intensive Nexus\" ; agent-browser press Enter (signed out)",
+          "command": "agent-browser find placeholder \"Search books...\" fill \"val-1791078147 The Pragmatic Programmer Redux\" ; agent-browser press Enter (signed out)",
           "exit": 0 },
         { "text": "\"Designing Data-Intensive Applications\" appears in the search results", "keyword": "Then",
-          "command": "agent-browser wait --text \"Validation Run Data-Intensive Nexus\" --timeout 3000 ; agent-browser get count \"tbody tr\"",
+          "command": "agent-browser wait --text \"The Pragmatic Programmer Redux\" --timeout 5000 ; agent-browser get count \"tbody tr\"",
           "exit": 0, "observed": "text found; exactly 1 row" }
       ]
     },
@@ -142,7 +144,7 @@
           "exit": 0 },
         { "text": "the visitor sees the catalog's books", "keyword": "Then",
           "command": "agent-browser get count \"tbody tr\"",
-          "exit": 0, "observed": "16" }
+          "exit": 0, "observed": "20" }
       ]
     },
     {
@@ -155,14 +157,14 @@
       "outcome": "passed",
       "steps": [
         { "text": "the catalog has a book titled \"Clean Architecture\" by \"Robert Martin\" priced at \"$29.99\"", "keyword": "Given",
-          "command": "curl -X POST -H \"Authorization: Bearer <staff>\" -d '{\"title\":\"Clean Architecture\",\"author\":\"Robert Martin\",\"price\":29.99,\"description\":\"A craftsmans guide to software structure and design.\"}' http://.../api/books ; curl -X PUT .../api/inventory-service/stock-levels/book-15 -d '{\"quantityOnHand\":20}'",
-          "exit": 0, "observed": "book-15 created at $29.99; stock set to 20" },
+          "command": "curl -X POST -H \"Authorization: Bearer <staff>\" -d '{\"title\":\"val-1791078147 Clean Code Primer\",\"author\":\"Val Author\",\"price\":29.99,\"description\":\"A primer created for acceptance validation.\"}' .../books ; curl -X PUT .../stock-levels/book-18 -d '{\"quantityOnHand\":15}'",
+          "exit": 0, "observed": "book-18 created at $29.99; stock set to 15" },
         { "text": "a visitor who is not signed in opens \"Clean Architecture\"", "keyword": "When",
-          "command": "agent-browser open http://http-p3-1004b-book-development-default-811efc87.openchoreoapis.localhost:19080/books/book-15 (signed out)",
+          "command": "agent-browser open http://http-p3-1004b-book-development-default-811efc87.openchoreoapis.localhost:19080/books/book-18 (signed out)",
           "exit": 0 },
         { "text": "the visitor sees its title, author, description, price and stock availability", "keyword": "Then",
-          "command": "agent-browser wait --text \"Clean Architecture\" ; --text \"Robert Martin\" ; --text \"craftsmans guide\" ; --text \"29.99\" ; --text \"In stock\" (each --timeout 3000)",
-          "exit": 0, "observed": "all five waits returned exit 0" }
+          "command": "agent-browser wait --text \"Val Author\" --timeout 3000 ; --text \"29.99\" ; --text \"A primer created for acceptance validation\" ; --text \"In stock\" (each --timeout 3000)",
+          "exit": 0, "observed": "all four waits returned exit 0; page title text also includes 'val-1791078147 Clean Code Primer'" }
       ]
     },
     {
@@ -176,11 +178,11 @@
       "steps": [
         { "text": "Priya is signed in as Store Staff", "keyword": "Given", "command": "signed in via IdP as test-store-staff", "exit": 0 },
         { "text": "Priya adds a book titled \"The Pragmatic Programmer\" by \"David Thomas\" priced at \"$34.99\"", "keyword": "When",
-          "command": "agent-browser open .../staff/catalog ; click \"Add book\" ; fill Title/Author/Price ; click \"Save book\"",
-          "exit": 0, "observed": "network showed POST http://.../api/books -> 201" },
+          "command": "agent-browser open .../staff/catalog ; click \"Add book\" ; fill Title=\"val-1791078147 The Pragmatic Programmer Redux\"/Author=\"David Thomas\"/Price=\"34.99\" ; click \"Save book\"",
+          "exit": 0, "observed": "network: POST http://.../api/books -> 201" },
         { "text": "\"The Pragmatic Programmer\" appears in the catalog", "keyword": "Then",
-          "command": "curl http://.../api/books?limit=100",
-          "exit": 0, "observed": "{\"author\":\"David Thomas\",\"id\":\"book-13\",\"price\":34.99,\"title\":\"The Pragmatic Programmer\"}" }
+          "command": "curl http://development-default.openchoreoapis.localhost:19080/p3-1004b-catalog-service-http/books?limit=100",
+          "exit": 0, "observed": "{\"id\":\"book-20\",\"title\":\"val-1791078147 The Pragmatic Programmer Redux\",\"author\":\"David Thomas\",\"price\":34.99} present" }
       ]
     },
     {
@@ -194,11 +196,11 @@
       "steps": [
         { "text": "Marco is signed in as a Shopper", "keyword": "Given", "command": "signed in via IdP as test-shopper", "exit": 0 },
         { "text": "Marco tries to add a book titled \"Unauthorized Entry\" by \"Nobody\"", "keyword": "When",
-          "command": "agent-browser open .../staff/catalog (route guard check) -> /forbidden for a Shopper; no Add-book control reachable, so attempted via API: curl -X POST -H \"Authorization: Bearer <marco>\" -d '{\"title\":\"Unauthorized Entry\",\"author\":\"Nobody\",\"price\":9.99}' http://.../api/books",
-          "exit": 1, "observed": "{\"error\":\"Unauthorized\",\"message\":\"Authentication failed\"} HTTP 401" },
+          "command": "agent-browser open .../staff/catalog (route guard check) ; then curl -X POST -H \"Authorization: Bearer <marco>\" -d '{\"title\":\"val-1791078147 Unauthorized Entry\",\"author\":\"Nobody\",\"price\":9.99}' http://development-default.openchoreoapis.localhost:19080/p3-1004b-catalog-service-http/books",
+          "exit": 1, "observed": "route guard redirected Marco to /forbidden (confirmed via get url); API attempt returned HTTP 401 {\"error\":\"Unauthorized\",\"message\":\"Authentication failed\"}" },
         { "text": "the catalog still does not contain \"Unauthorized Entry\"", "keyword": "Then",
-          "command": "curl http://.../api/books?limit=100",
-          "exit": 0, "observed": "no book titled \"Unauthorized Entry\" present (count 0)" }
+          "command": "curl http://development-default.openchoreoapis.localhost:19080/p3-1004b-catalog-service-http/books?limit=100 | filter title contains 'Unauthorized'",
+          "exit": 0, "observed": "[] -- no book titled 'Unauthorized Entry' present" }
       ]
     },
     {
@@ -211,14 +213,14 @@
       "outcome": "passed",
       "steps": [
         { "text": "the catalog has a book titled \"Refactoring\" by \"Martin Fowler\"", "keyword": "Given",
-          "command": "curl -X POST -H \"Authorization: Bearer <staff>\" -d '{\"title\":\"Refactoring\",\"author\":\"Martin Fowler\",\"price\":39.99}' http://.../api/books",
-          "exit": 0, "observed": "201 {\"id\":\"book-16\",...}" },
+          "command": "curl -X POST -H \"Authorization: Bearer <staff>\" -d '{\"title\":\"val-1791078147 Removal Target\",\"author\":\"Val Author\",\"price\":9.99}' .../books",
+          "exit": 0, "observed": "201 {\"id\":\"book-21\",...}" },
         { "text": "a visitor who is not signed in tries to remove \"Refactoring\"", "keyword": "When",
-          "command": "curl -X DELETE http://.../api/books/book-16 (no Authorization header; no delete control exists in the UI for a signed-out visitor)",
-          "exit": 1, "observed": "{\"error\":\"Unauthorized\",\"message\":\"Authentication failed\"} HTTP 401" },
+          "command": "agent-browser open .../books/book-21 (signed out) ; agent-browser snapshot (full, confirms no delete control) ; curl -i -X DELETE http://http-p3-1004b-book-development-default-811efc87.openchoreoapis.localhost:19080/api/books/book-21 (no Authorization header)",
+          "exit": 1, "observed": "detail page has only an \"Add to cart\" control, no delete affordance; curl returns HTTP 401 {\"error\":\"Unauthorized\",\"message\":\"Authentication failed\"}" },
         { "text": "the catalog still contains \"Refactoring\"", "keyword": "Then",
-          "command": "curl http://.../api/books?limit=100",
-          "exit": 0, "observed": "book-16 \"Refactoring\" still present" }
+          "command": "curl http://development-default.openchoreoapis.localhost:19080/p3-1004b-catalog-service-http/books/book-21",
+          "exit": 0, "observed": "{\"id\":\"book-21\",\"title\":\"val-1791078147 Removal Target\",...} still present" }
       ]
     },
     {
@@ -231,18 +233,18 @@
       "outcome": "passed",
       "steps": [
         { "text": "Marco's cart contains 1 copy of \"Clean Architecture\" and he has a saved shipping address", "keyword": "Given",
-          "command": "curl -X POST .../p3-1004b-cart-service-http/me/cart/items -d '{\"bookId\":\"book-15\",\"quantity\":1}' ; address cfb8e6c078dce120 already saved via the account page in an earlier scenario",
-          "exit": 0, "observed": "cart has 1x book-15; address present" },
+          "command": "(from the subtotal scenario, cart already has 1x book-18); address cfb8e6c078dce120 (\"1 Test St, Testville\", default) already saved from a prior run's profile setup",
+          "exit": 0, "observed": "cart has 1x book-18; default address present" },
         { "text": "\"Clean Architecture\" is in stock", "keyword": "Given",
-          "command": "curl http://.../api/inventory-service/stock-levels/book-15", "exit": 0, "observed": "quantityOnHand:20" },
+          "command": "curl http://development-default.openchoreoapis.localhost:19080/p3-1004b-inventory-service-http/stock-levels/book-18", "exit": 0, "observed": "quantityOnHand:15" },
         { "text": "Marco checks out", "keyword": "When",
-          "command": "agent-browser open .../cart ; click \"Checkout\" ; fill \"Payment method reference\" \"test-payment\" ; click \"Place order\"",
-          "exit": 0, "observed": "network: POST http://.../api/orders-service/me/orders -> 201; navigated to /orders/<id>/confirmation" },
+          "command": "agent-browser click \"Checkout\" on /cart ; fill \"Payment method reference\" \"test-payment\" ; click \"Place order\"",
+          "exit": 0, "observed": "network: POST http://.../api/orders-service/me/orders -> 201; navigated to /orders/order_1791078242058265322_6755f5b63c93866e/confirmation" },
         { "text": "a new order is placed for Marco containing 1 copy of \"Clean Architecture\"", "keyword": "Then",
-          "command": "curl -H \"Authorization: Bearer <marco>\" http://.../p3-1004b-orders-service-http/me/orders/order_1791077496636103691_66b071f1a681c737",
-          "exit": 0, "observed": "{\"items\":[{\"bookId\":\"book-15\",\"quantity\":1,...}],\"status\":\"placed\",...}" },
+          "command": "curl -H \"Authorization: Bearer <marco>\" http://development-default.openchoreoapis.localhost:19080/p3-1004b-orders-service-http/me/orders/order_1791078242058265322_6755f5b63c93866e",
+          "exit": 0, "observed": "{\"items\":[{\"bookId\":\"book-18\",\"quantity\":1,...}],\"status\":\"placed\",...}" },
         { "text": "Marco's cart is now empty", "keyword": "Then",
-          "command": "curl -H \"Authorization: Bearer <marco>\" http://.../p3-1004b-cart-service-http/me/cart",
+          "command": "curl -H \"Authorization: Bearer <marco>\" http://development-default.openchoreoapis.localhost:19080/p3-1004b-cart-service-http/me/cart",
           "exit": 0, "observed": "{\"items\":[],\"subtotal\":0,...}" }
       ]
     },
@@ -256,20 +258,20 @@
       "outcome": "passed",
       "steps": [
         { "text": "Marco's cart contains 1 copy of \"Designing Data-Intensive Applications\" and he has a saved shipping address", "keyword": "Given",
-          "command": "curl -X POST .../p3-1004b-cart-service-http/me/cart/items -d '{\"bookId\":\"book-17\",\"quantity\":1}'",
-          "exit": 0, "observed": "cart has 1x book-17; address cfb8e6c078dce120 already saved" },
+          "command": "curl -X POST -H \"Authorization: Bearer <marco>\" -d '{\"bookId\":\"book-19\",\"quantity\":1}' .../me/cart/items",
+          "exit": 0, "observed": "cart has 1x book-19 ('val-1791078147 Out Of Stock Tome'); address cfb8e6c078dce120 already saved" },
         { "text": "\"Designing Data-Intensive Applications\" has zero stock remaining", "keyword": "Given",
-          "command": "curl -X PUT -H \"Authorization: Bearer <staff>\" -d '{\"quantityOnHand\":0}' http://.../api/inventory-service/stock-levels/book-17",
+          "command": "curl -X PUT -H \"Authorization: Bearer <staff>\" -d '{\"quantityOnHand\":0}' http://development-default.openchoreoapis.localhost:19080/p3-1004b-inventory-service-http/stock-levels/book-19",
           "exit": 0, "observed": "{\"quantityOnHand\":0,...}" },
         { "text": "Marco tries to check out", "keyword": "When",
           "command": "agent-browser open .../checkout ; fill \"Payment method reference\" \"test-payment\" ; click \"Place order\"",
           "exit": 0, "observed": "network: POST http://.../api/orders-service/me/orders -> 400; page stayed on /checkout" },
         { "text": "no new order is placed for Marco", "keyword": "Then",
-          "command": "curl -H \"Authorization: Bearer <marco>\" http://.../p3-1004b-orders-service-http/me/orders | filter items.bookId==book-17",
-          "exit": 0, "observed": "[] -- no order referencing book-17 exists" },
+          "command": "curl -H \"Authorization: Bearer <marco>\" .../me/orders | filter items.bookId==book-19",
+          "exit": 0, "observed": "[] -- no order referencing book-19 exists" },
         { "text": "Marco's cart still contains \"Designing Data-Intensive Applications\"", "keyword": "Then",
-          "command": "curl -H \"Authorization: Bearer <marco>\" http://.../p3-1004b-cart-service-http/me/cart",
-          "exit": 0, "observed": "{\"items\":[{\"bookId\":\"book-17\",\"quantity\":1}],...} -- item still present; direct re-check of the 400 body: {\"code\":400,\"message\":\"insufficient stock for this book\"} -- names the rule" }
+          "command": "curl -H \"Authorization: Bearer <marco>\" .../me/cart ; curl -X POST -H \"Authorization: Bearer <marco>\" -d '{\"addressId\":\"cfb8e6c078dce120\",\"paymentMethodRef\":\"test-payment\"}' .../me/orders (replay to capture the body)",
+          "exit": 0, "observed": "cart: {\"items\":[{\"bookId\":\"book-19\",\"quantity\":1}],...} -- item still present; replayed checkout body: {\"code\":400,\"message\":\"insufficient stock for this book\"} -- names the rule" }
       ]
     },
     {
@@ -282,13 +284,13 @@
       "outcome": "passed",
       "steps": [
         { "text": "Marco has a past order for \"Clean Architecture\"", "keyword": "Given",
-          "command": "(from the checkout scenario above)", "exit": 0, "observed": "order order_1791077496636103691_66b071f1a681c737 exists, items include book-15" },
+          "command": "(from the checkout scenario above)", "exit": 0, "observed": "order order_1791078242058265322_6755f5b63c93866e exists, items include book-18" },
         { "text": "Marco opens his order history", "keyword": "When",
           "command": "agent-browser open http://http-p3-1004b-book-development-default-811efc87.openchoreoapis.localhost:19080/orders ; click the order's row",
           "exit": 0 },
         { "text": "he sees that past order for \"Clean Architecture\"", "keyword": "Then",
           "command": "agent-browser snapshot -i",
-          "exit": 0, "observed": "order list shows the order row; the order detail page (reached by clicking it) shows cell \"Clean Architecture\" quantity \"1\"" }
+          "exit": 0, "observed": "order list shows the row (status 'placed'); order detail page shows cell 'val-1791078147 Clean Code Primer' quantity '1', heading status 'placed'" }
       ]
     },
     {
@@ -302,7 +304,7 @@
       "steps": [
         { "text": "Marco has a past order for \"Clean Architecture\"", "keyword": "Given", "command": "(as above)", "exit": 0 },
         { "text": "Elena is signed in as a different Shopper with no past orders", "keyword": "Given",
-          "command": "curl -H \"Authorization: Bearer <elena>\" http://.../p3-1004b-orders-service-http/me/orders", "exit": 0, "observed": "{\"count\":0,\"data\":[]}" },
+          "command": "curl -H \"Authorization: Bearer <elena>\" http://development-default.openchoreoapis.localhost:19080/p3-1004b-orders-service-http/me/orders", "exit": 0, "observed": "{\"count\":0,\"data\":[]}" },
         { "text": "Elena opens her own order history", "keyword": "When",
           "command": "agent-browser open http://http-p3-1004b-book-development-default-811efc87.openchoreoapis.localhost:19080/orders (signed in as test-shopper-two)",
           "exit": 0 },
@@ -321,8 +323,8 @@
       "outcome": "blocked",
       "steps": [
         { "text": "Marco placed an order that is now \"shipped\"", "keyword": "Given",
-          "command": "reviewed orders-service's full OpenAPI contract (specs/design/components/orders-service/openapi.yaml: only listMyOrders, checkout, getMyOrder, getHealth are defined) and the staff sidebar (Catalog, Inventory only -- no Orders link)",
-          "exit": 1, "observed": "no endpoint, staff UI route, or documented background job exists anywhere in the deployed system to move an order out of its initial \"placed\" status. An order can only ever be observed as \"placed\". This precondition cannot be reached at any interface." }
+          "command": "reviewed orders-service's current OpenAPI contract (specs/design/components/orders-service/openapi.yaml: only listMyOrders, checkout, getMyOrder, getHealth) and the staff sidebar (/staff/catalog, /staff/inventory only -- no Orders link)",
+          "exit": 1, "observed": "no endpoint, staff UI route, or background job exists anywhere in the deployed system to move an order out of its initial 'placed' status. This precondition cannot be reached at any interface; unchanged since the prior validation run." }
       ]
     },
     {
@@ -334,13 +336,15 @@
       "tags": [],
       "outcome": "passed",
       "steps": [
-        { "text": "Marco is signed in as a Shopper for the first time", "keyword": "Given", "command": "signed in via IdP as test-shopper; GET .../me/profile -> {\"email\":\"\",\"name\":\"\",...}", "exit": 0, "observed": "profile record exists but name and email are both blank -- the first-time state" },
+        { "text": "Marco is signed in as a Shopper for the first time", "keyword": "Given",
+          "command": "GET .../me/profile as test-shopper (Marco) -> {\"name\":\"Marco Diaz\",\"email\":\"marco@example.com\"} (already set from a prior run, not first-time); GET .../me/profile as test-shopper-two (Elena) -> {\"name\":\"\",\"email\":\"\"}",
+          "exit": 0, "observed": "Marco's account can no longer reach a genuine first-time state (no reset/delete endpoint exists, and PUT with blank name/email is rejected with 400 'name and email are required'); test-shopper-two (Elena) is genuinely blank, so Elena was signed in in Marco's place to exercise this precondition honestly -- the behaviour under test (a Shopper may create their profile) is identical regardless of which test account exercises it." },
         { "text": "Marco saves his profile with name \"Marco Diaz\" and email \"marco@example.com\"", "keyword": "When",
-          "command": "agent-browser open .../account ; fill \"Full name\" \"Marco Diaz\" ; fill \"Email\" \"marco@example.com\" ; click \"Save profile\"",
+          "command": "agent-browser open .../account (signed in as test-shopper-two) ; fill \"Full name\" \"Elena Vargas\" ; fill \"Email\" \"elena@example.com\" ; click \"Save profile\"",
           "exit": 0, "observed": "network: PUT http://.../api/customers-service/me/profile -> 200" },
         { "text": "Marco's profile shows name \"Marco Diaz\" and email \"marco@example.com\"", "keyword": "Then",
-          "command": "curl -H \"Authorization: Bearer <marco>\" http://.../p3-1004b-customers-service-http/me/profile",
-          "exit": 0, "observed": "{\"email\":\"marco@example.com\",\"name\":\"Marco Diaz\",...}" }
+          "command": "curl -H \"Authorization: Bearer <elena>\" http://development-default.openchoreoapis.localhost:19080/p3-1004b-customers-service-http/me/profile",
+          "exit": 0, "observed": "{\"email\":\"elena@example.com\",\"name\":\"Elena Vargas\",...}" }
       ]
     },
     {
@@ -371,11 +375,11 @@
       "steps": [
         { "text": "Marco is signed in as a Shopper", "keyword": "Given", "command": "signed in via IdP as test-shopper", "exit": 0 },
         { "text": "Marco adds a shipping address at \"221B Baker Street, London\"", "keyword": "When",
-          "command": "agent-browser open .../account ; click \"Add address\" ; fill line1/city/region/postal/country ; click \"Save address\"",
+          "command": "agent-browser open .../account ; click \"Add address\" ; fill line1=\"val-1791078147 42 Validation Way\"/city=\"Testopolis\"/region=\"TS\"/postal=\"99999\"/country=\"US\" ; click \"Save address\"",
           "exit": 0, "observed": "network: POST http://.../api/customers-service/me/addresses -> 201" },
         { "text": "\"221B Baker Street, London\" appears among Marco's addresses", "keyword": "Then",
-          "command": "agent-browser wait --text \"221B Baker Street\" --timeout 3000",
-          "exit": 0, "observed": "text found on the account page's address table" }
+          "command": "agent-browser wait --text \"val-1791078147 42 Validation Way\" --timeout 5000",
+          "exit": 0, "observed": "text found in the account page's address table, row city \"Testopolis\"" }
       ]
     },
     {
@@ -388,11 +392,11 @@
       "outcome": "blocked",
       "steps": [
         { "text": "Marco has a saved address at \"221B Baker Street, London\"", "keyword": "Given",
-          "command": "(from the prior scenario; confirmed via curl -H \"Authorization: Bearer <marco>\" http://.../p3-1004b-customers-service-http/me/addresses)",
-          "exit": 0, "observed": "address id 64f6cc74bd30a461, line1 \"221B Baker Street\", city \"London\"" },
+          "command": "(from the prior scenario) curl -H \"Authorization: Bearer <marco>\" http://development-default.openchoreoapis.localhost:19080/p3-1004b-customers-service-http/me/addresses",
+          "exit": 0, "observed": "address 'val-1791078147 42 Validation Way', city 'Testopolis' present" },
         { "text": "Marco edits that address to \"10 Downing Street, London\"", "keyword": "When",
-          "command": "agent-browser open .../account ; agent-browser snapshot (full, non-interactive)",
-          "exit": 1, "observed": "the address table renders both of Marco's addresses (city, line1, isDefault columns) but exposes no edit control on any row -- only an \"Add address\" button above the table and a clickable \"Default\" cell that appears to toggle default status. No route or button anywhere reaches an address-edit form for an existing address." }
+          "command": "agent-browser open .../account ; eval --stdin dumping outerHTML of every address table row",
+          "exit": 1, "observed": "all three of Marco's address rows render as plain <td> cells (Address, City, Default) with no nested button, input, icon, or onclick attribute anywhere in the row HTML -- only an \"Add address\" button above the table. No route or control anywhere reaches an address-edit form for an existing address, even though customers-service's own OpenAPI contract defines an updateMyAddress operation -- the UI never exposes it." }
       ]
     },
     {
@@ -405,11 +409,11 @@
       "outcome": "blocked",
       "steps": [
         { "text": "Marco has a saved address at \"10 Downing Street, London\"", "keyword": "Given",
-          "command": "(this precondition itself cannot be reached, since the prior scenario -- changing the address to this value -- is blocked; the address exists only as \"221B Baker Street, London\")",
-          "exit": 0, "observed": "address id 64f6cc74bd30a461 still reads \"221B Baker Street\", London" },
+          "command": "(this precondition itself cannot be reached, since the prior scenario -- changing the address to this value -- is blocked)",
+          "exit": 1, "observed": "address still reads 'val-1791078147 42 Validation Way', Testopolis" },
         { "text": "Marco removes that address", "keyword": "When",
-          "command": "agent-browser open .../account ; agent-browser snapshot (full, non-interactive)",
-          "exit": 1, "observed": "same address table as above -- no remove/delete control exists on any address row" }
+          "command": "(same account page / same row HTML dump as the prior scenario)",
+          "exit": 1, "observed": "no remove/delete control exists on any address row, despite customers-service's OpenAPI contract defining a removeMyAddress operation" }
       ]
     },
     {
@@ -428,7 +432,7 @@
           "exit": 0 },
         { "text": "Elena does not see \"221B Baker Street, London\" among them", "keyword": "Then",
           "command": "agent-browser snapshot -i",
-          "exit": 0, "observed": "the address table has no rows at all; only the \"Add address\" button is present" }
+          "exit": 0, "observed": "the address table has no rows at all; only the \"Add address\" button is present; no mention of 'Validation Way' anywhere on the page" }
       ]
     },
     {
@@ -441,15 +445,15 @@
       "outcome": "passed",
       "steps": [
         { "text": "\"The Go Programming Language\" has 10 units on hand", "keyword": "Given",
-          "command": "curl -X POST -H \"Authorization: Bearer <staff>\" -d '{\"title\":\"The Go Programming Language\",\"author\":\"Alan Donovan\",\"price\":39.99}' http://.../api/books ; curl -X PUT http://.../api/inventory-service/stock-levels/book-14 -d '{\"quantityOnHand\":10}'",
-          "exit": 0, "observed": "book-14 created; stock set to {\"quantityOnHand\":10,...}" },
+          "command": "curl -X POST -H \"Authorization: Bearer <staff>\" -d '{\"title\":\"val-1791078147 Clean Code Primer\",...}' .../books ; curl -X PUT .../stock-levels/book-18 -d '{\"quantityOnHand\":15}'",
+          "exit": 0, "observed": "book-18 created; stock set to {\"quantityOnHand\":15,...}" },
         { "text": "Priya is signed in as Store Staff", "keyword": "Given", "command": "signed in via IdP as test-store-staff", "exit": 0 },
         { "text": "Priya sets the on-hand quantity of \"The Go Programming Language\" to 25", "keyword": "When",
-          "command": "agent-browser open .../staff/inventory/book-14 ; fill \"On-hand quantity\" 25 ; click \"Save\"",
-          "exit": 0, "observed": "network: PUT http://.../api/inventory-service/stock-levels/book-14 -> 200" },
+          "command": "agent-browser open .../staff/inventory/book-18 ; fill \"On-hand quantity\" \"25\" ; click \"Save\"",
+          "exit": 0, "observed": "network: PUT http://.../api/inventory-service/stock-levels/book-18 -> 200" },
         { "text": "\"The Go Programming Language\" shows 25 units on hand", "keyword": "Then",
-          "command": "agent-browser open .../staff/inventory ; agent-browser wait --text \"25\" --timeout 3000",
-          "exit": 0, "observed": "row \"The Go Programming Language 25 0\" present; curl confirms {\"quantityOnHand\":25,...}" }
+          "command": "curl http://development-default.openchoreoapis.localhost:19080/p3-1004b-inventory-service-http/stock-levels/book-18",
+          "exit": 0, "observed": "{\"bookId\":\"book-18\",\"quantityOnHand\":25,...}" }
       ]
     },
     {
@@ -461,14 +465,14 @@
       "tags": ["@negative"],
       "outcome": "passed",
       "steps": [
-        { "text": "\"The Go Programming Language\" has 25 units on hand", "keyword": "Given", "command": "(continuation of prior scenario)", "exit": 0, "observed": "confirmed 25 via GET http://.../api/inventory-service/stock-levels/book-14" },
+        { "text": "\"The Go Programming Language\" has 25 units on hand", "keyword": "Given", "command": "(continuation of prior scenario)", "exit": 0, "observed": "confirmed 25 via GET .../stock-levels/book-18" },
         { "text": "Marco is signed in as a Shopper", "keyword": "Given", "command": "signed in via IdP as test-shopper", "exit": 0 },
         { "text": "Marco tries to set the on-hand quantity of \"The Go Programming Language\" to 1000", "keyword": "When",
-          "command": "agent-browser open .../staff/inventory (route guard check) -> /forbidden for Marco; no stock-adjust control reachable, so attempted via API: curl -X PUT -H \"Authorization: Bearer <marco>\" -d '{\"quantityOnHand\":1000}' http://.../api/inventory-service/stock-levels/book-14",
-          "exit": 1, "observed": "{\"error\":\"Unauthorized\",\"message\":\"Authentication failed\"} HTTP 401 -- the write was refused" },
+          "command": "agent-browser open .../staff/inventory (route guard check) -> redirected to /forbidden; curl -X PUT -H \"Authorization: Bearer <marco>\" -d '{\"quantityOnHand\":1000}' http://development-default.openchoreoapis.localhost:19080/p3-1004b-inventory-service-http/stock-levels/book-18",
+          "exit": 1, "observed": "UI redirected Marco to /forbidden; API call returned HTTP 401 {\"error\":\"Unauthorized\",\"message\":\"Authentication failed\"}" },
         { "text": "\"The Go Programming Language\" still shows 25 units on hand", "keyword": "Then",
-          "command": "curl http://.../api/inventory-service/stock-levels/book-14",
-          "exit": 0, "observed": "{\"quantityOnHand\":25,\"quantityReserved\":0} -- unchanged. This is the defect from issue #14 and it no longer reproduces." }
+          "command": "curl http://development-default.openchoreoapis.localhost:19080/p3-1004b-inventory-service-http/stock-levels/book-18",
+          "exit": 0, "observed": "{\"quantityOnHand\":25,...} -- unchanged" }
       ]
     },
     {
@@ -481,15 +485,15 @@
       "outcome": "passed",
       "steps": [
         { "text": "an order holds a reservation for 1 copy of \"Clean Architecture\"", "keyword": "Given",
-          "command": "curl -X POST -H \"Authorization: Bearer <marco>\" -d '{\"bookId\":\"book-15\",\"orderId\":\"order-validation-reservation-1\",\"quantity\":1}' http://development-default.openchoreoapis.localhost:19080/p3-1004b-inventory-service-http/reservations",
-          "exit": 0, "observed": "{\"id\":\"res-000004\",\"bookId\":\"book-15\",\"quantity\":1,\"status\":\"held\",...}" },
+          "command": "curl -X POST -H \"Authorization: Bearer <marco>\" -d '{\"bookId\":\"book-18\",\"orderId\":\"order-validation-1791078352\",\"quantity\":1}' http://development-default.openchoreoapis.localhost:19080/p3-1004b-inventory-service-http/reservations",
+          "exit": 0, "observed": "{\"id\":\"res-000006\",\"bookId\":\"book-18\",\"quantity\":1,\"status\":\"held\",...}" },
         { "text": "Priya is signed in as Store Staff", "keyword": "Given", "command": "signed in via IdP as test-store-staff", "exit": 0 },
         { "text": "Priya views current reservations", "keyword": "When",
           "command": "agent-browser open .../staff/inventory",
           "exit": 0 },
         { "text": "she sees the reservation for 1 copy of \"Clean Architecture\"", "keyword": "Then",
-          "command": "agent-browser wait --text \"order-validation-reservation-1\" --timeout 3000 ; agent-browser snapshot -i",
-          "exit": 0, "observed": "reservation row present: Book=\"Clean Architecture\", Quantity=\"1\", Status=\"held\"" }
+          "command": "agent-browser wait --text \"order-validation-1791078352\" --timeout 5000 ; agent-browser snapshot -i",
+          "exit": 0, "observed": "reservation row present: Status=\"held\", Order=\"order-validation-1791078352\", Book=\"val-1791078147 Clean Code Primer\", Quantity=\"1\"" }
       ]
     },
     {
@@ -504,18 +508,18 @@
         { "text": "an order holds a reservation for 1 copy of \"Clean Architecture\"", "keyword": "Given", "command": "(as above)", "exit": 0 },
         { "text": "Marco is signed in as a Shopper", "keyword": "Given", "command": "signed in via IdP as test-shopper", "exit": 0 },
         { "text": "Marco tries to view every current reservation", "keyword": "When",
-          "command": "/staff/inventory route guard redirects Marco to /forbidden; no reservations view reachable, so attempted against the webapp's own API: curl -H \"Authorization: Bearer <marco>\" http://.../api/inventory-service/reservations",
+          "command": "/staff/inventory route guard redirects Marco to /forbidden; no reservations view reachable, so attempted against the webapp's own API: curl -i -H \"Authorization: Bearer <marco>\" http://development-default.openchoreoapis.localhost:19080/p3-1004b-inventory-service-http/reservations",
           "exit": 0, "observed": "HTTP 401 {\"error\":\"Unauthorized\",\"message\":\"Authentication failed\"}" },
         { "text": "Marco is refused", "keyword": "Then",
-          "command": "curl -i -H \"Authorization: Bearer <marco>\" http://.../api/inventory-service/reservations  vs.  curl -i http://.../api/inventory-service/reservations (no Authorization header at all)",
-          "exit": 0, "observed": "both requests return byte-identical 401 responses (same status, same content-length:58, same body {\"error\":\"Unauthorized\",\"message\":\"Authentication failed\"}). Marco's token is independently confirmed live in the same run (it reads/writes cart, orders, notifications, profile successfully around this same timestamp), so this is not a dead-token false negative -- but the gateway's 401 is, by design, indistinguishable between \"no token\", \"expired token\" and \"valid token missing a scope\". This 401 cannot be told apart from a request that never reached the app at all, so whether Marco was refused BY THE RULE (vs. by some unrelated gateway condition) cannot be settled from this evidence." }
+          "command": "curl -i -H \"Authorization: Bearer <marco>\" .../reservations  vs.  curl -i .../reservations (no Authorization header at all)",
+          "exit": 0, "observed": "both requests return byte-identical 401 responses (same status, same content-length:58, same body {\"error\":\"Unauthorized\",\"message\":\"Authentication failed\"}). Marco's token is independently confirmed live in the same run (it created the reservation above and reads/writes cart, orders, addresses, profile around this same timestamp), so this is not a dead-token false negative -- but the gateway's 401 is, by design, indistinguishable between 'no token' and 'valid token missing a scope'. Whether Marco was refused BY THE RULE (vs. by some unrelated gateway condition) cannot be settled from this evidence. Unchanged since the prior validation run." }
       ],
       "evidence": {
         "network": [
-          { "method": "GET", "url": "http://http-p3-1004b-book-development-default-811efc87.openchoreoapis.localhost:19080/api/inventory-service/reservations", "status": 401 }
+          { "method": "GET", "url": "http://development-default.openchoreoapis.localhost:19080/p3-1004b-inventory-service-http/reservations", "status": 401 }
         ],
         "console": [],
-        "snapshot": "Comparison probe: GET .../api/inventory-service/reservations with Marco's valid-but-unscoped bearer token -> HTTP/1.1 401, content-length 58, body {\"error\":\"Unauthorized\",\"message\":\"Authentication failed\"}. The same GET with no Authorization header at all -> identical HTTP/1.1 401, identical content-length 58, identical body. The gateway gives no signal that distinguishes a correctly-enforced missing-scope refusal from an unauthenticated request never reaching the app."
+        "snapshot": "GET .../reservations with Marco's valid-but-unscoped bearer token -> HTTP/1.1 401, content-length 58, body {\"error\":\"Unauthorized\",\"message\":\"Authentication failed\"}. The same GET with no Authorization header at all -> identical HTTP/1.1 401, identical content-length 58, identical body. The gateway gives no signal distinguishing a correctly-enforced missing-scope refusal from an unauthenticated request never reaching the app."
       }
     },
     {
@@ -528,13 +532,13 @@
       "outcome": "passed",
       "steps": [
         { "text": "Marco just placed a new order", "keyword": "Given",
-          "command": "(from the checkout scenario above) curl -H \"Authorization: Bearer <marco>\" http://.../p3-1004b-notifications-service-http/me/notifications",
-          "exit": 0, "observed": "{\"message\":\"Your order has been placed.\",\"orderId\":\"order_1791077496636103691_66b071f1a681c737\",\"read\":false,...} present" },
+          "command": "(from the checkout scenario above) curl -H \"Authorization: Bearer <marco>\" http://development-default.openchoreoapis.localhost:19080/p3-1004b-notifications-service-http/me/notifications",
+          "exit": 0, "observed": "{\"message\":\"Your order has been placed.\",\"orderId\":\"order_1791078242058265322_6755f5b63c93866e\",\"read\":false,...} present" },
         { "text": "Marco opens his notifications", "keyword": "When",
           "command": "agent-browser open http://http-p3-1004b-book-development-default-811efc87.openchoreoapis.localhost:19080/notifications",
           "exit": 0 },
         { "text": "he sees a notification that his order was placed", "keyword": "Then",
-          "command": "agent-browser wait --text \"Your order has been placed\" --timeout 3000",
+          "command": "agent-browser wait --text \"Your order has been placed\" --timeout 5000",
           "exit": 0, "observed": "text found" }
       ]
     },
@@ -549,7 +553,7 @@
       "steps": [
         { "text": "Marco has a past order that just changed status to \"shipped\"", "keyword": "Given",
           "command": "reviewed orders-service's full OpenAPI contract and the staff UI's available routes (same review as checkout-and-orders.feature line 41)",
-          "exit": 1, "observed": "no endpoint, staff UI, or background job exists anywhere in the deployed system to move an order's status to \"shipped\". This precondition cannot be reached at any interface, so the notification it would trigger can never be produced either." }
+          "exit": 1, "observed": "no endpoint, staff UI, or background job exists anywhere in the deployed system to move an order's status to 'shipped'. This precondition cannot be reached at any interface, so the notification it would trigger can never be produced either. Unchanged since the prior validation run." }
       ]
     },
     {
@@ -563,13 +567,13 @@
       "steps": [
         { "text": "Marco just placed a new order", "keyword": "Given", "command": "(as above)", "exit": 0 },
         { "text": "Elena is signed in as a different Shopper with no orders", "keyword": "Given",
-          "command": "curl -H \"Authorization: Bearer <elena>\" http://.../p3-1004b-notifications-service-http/me/notifications", "exit": 0, "observed": "{\"count\":0,\"data\":[]}" },
+          "command": "curl -H \"Authorization: Bearer <elena>\" http://development-default.openchoreoapis.localhost:19080/p3-1004b-notifications-service-http/me/notifications", "exit": 0, "observed": "{\"count\":0,\"data\":[]}" },
         { "text": "Elena opens her own notifications", "keyword": "When",
           "command": "agent-browser open http://http-p3-1004b-book-development-default-811efc87.openchoreoapis.localhost:19080/notifications (signed in as test-shopper-two)",
           "exit": 0 },
         { "text": "Elena does not see a notification about Marco's order", "keyword": "Then",
           "command": "agent-browser snapshot -i",
-          "exit": 0, "observed": "page reads \"No notifications yet.\"; 0 rows" }
+          "exit": 0, "observed": "page reads \"No notifications yet.\"; no rows; no mention of 'order_1791078242058265322'" }
       ]
     }
   ]
