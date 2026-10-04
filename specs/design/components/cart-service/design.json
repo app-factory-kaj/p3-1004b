@@ -7,10 +7,35 @@
   "appPath": "cart-service",
   "entrypoint": "deployment/service",
   "exposure": "internet",
-  "dependencies": [
-    { "kind": "platform-resource", "name": "user-auth", "resourceType": "thunder-app" }
+  "stories": [
+    6,
+    7
   ],
   "description": "Owns each signed-in Shopper's own cart: add/remove/update line items and read the current cart and subtotal, backed by an in-memory store with no database, one cart per customer. Every operation is scoped to the caller's own cart under /me. Does not perform checkout — orders-service reads the cart to create an order and then clears it.",
-  "stories": [6, 7],
-  "skillsPinned": ["openapi-conventions", "go", "thunder-authentication", "api-management"]
+  "dependencies": [
+    {
+      "kind": "platform-resource",
+      "name": "user-auth",
+      "resourceType": "thunder-app",
+      "wiring": {
+        "ref": "p3-1004b-user-auth",
+        "envBindings": {
+          "client_id": "USER_AUTH_CLIENT_ID",
+          "issuer": "USER_AUTH_ISSUER",
+          "jwks_url": "USER_AUTH_JWKS_URL",
+          "resource": "USER_AUTH_RESOURCE",
+          "scopes": "USER_AUTH_SCOPES"
+        }
+      }
+    }
+  ],
+  "exposesAPI": {
+    "auth": "end-user-required"
+  },
+  "skillsPinned": [
+    "openapi-conventions",
+    "go",
+    "thunder-authentication",
+    "api-management"
+  ]
 }

@@ -7,10 +7,34 @@
   "appPath": "notifications-service",
   "entrypoint": "deployment/service",
   "exposure": "internet",
-  "dependencies": [
-    { "kind": "platform-resource", "name": "user-auth", "resourceType": "thunder-app" }
+  "stories": [
+    12
   ],
   "description": "Owns in-app order-status notifications, backed by an in-memory store with no database. Every read is scoped to the caller's own notifications under /me; notifications are created by orders-service when an order's status changes. Does not send email or SMS — delivery is in-app only.",
-  "stories": [12],
-  "skillsPinned": ["openapi-conventions", "go", "thunder-authentication", "api-management"]
+  "dependencies": [
+    {
+      "kind": "platform-resource",
+      "name": "user-auth",
+      "resourceType": "thunder-app",
+      "wiring": {
+        "ref": "p3-1004b-user-auth",
+        "envBindings": {
+          "client_id": "USER_AUTH_CLIENT_ID",
+          "issuer": "USER_AUTH_ISSUER",
+          "jwks_url": "USER_AUTH_JWKS_URL",
+          "resource": "USER_AUTH_RESOURCE",
+          "scopes": "USER_AUTH_SCOPES"
+        }
+      }
+    }
+  ],
+  "exposesAPI": {
+    "auth": "end-user-required"
+  },
+  "skillsPinned": [
+    "openapi-conventions",
+    "go",
+    "thunder-authentication",
+    "api-management"
+  ]
 }

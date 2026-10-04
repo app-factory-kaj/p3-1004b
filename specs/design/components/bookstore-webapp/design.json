@@ -7,16 +7,135 @@
   "appPath": "bookstore-webapp",
   "entrypoint": "deployment/web-application",
   "exposure": "internet",
-  "dependencies": [
-    { "kind": "platform-resource", "name": "user-auth", "resourceType": "thunder-app" },
-    { "kind": "component", "name": "catalog-service", "description": "Lists and searches books, shows book detail, and lets Store Staff manage the catalog." },
-    { "kind": "component", "name": "customers-service", "description": "Lets the signed-in Shopper manage their profile and shipping addresses." },
-    { "kind": "component", "name": "cart-service", "description": "Lets the signed-in Shopper manage their cart before checkout." },
-    { "kind": "component", "name": "orders-service", "description": "Checks out the Shopper's cart and shows their order history and status." },
-    { "kind": "component", "name": "inventory-service", "description": "Shows stock availability and lets Store Staff adjust stock and view reservations." },
-    { "kind": "component", "name": "notifications-service", "description": "Shows the signed-in Shopper's in-app order-status notifications." }
+  "stories": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15
   ],
   "description": "The React storefront SPA: public catalog browsing and search, Shopper account/cart/checkout/order-history/notifications screens behind sign-in, and a Store Staff area for catalog and inventory management. Holds no business data itself — every screen is backed by one of the six services.",
-  "stories": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
-  "skillsPinned": ["wireframes", "react-webapp", "oxygen-ui-design-system", "thunder-authentication"]
+  "dependencies": [
+    {
+      "kind": "platform-resource",
+      "name": "user-auth",
+      "resourceType": "thunder-app",
+      "wiring": {
+        "ref": "p3-1004b-user-auth",
+        "envBindings": {
+          "client_id": "USER_AUTH_CLIENT_ID",
+          "issuer": "USER_AUTH_ISSUER",
+          "jwks_url": "USER_AUTH_JWKS_URL",
+          "resource": "USER_AUTH_RESOURCE",
+          "scopes": "USER_AUTH_SCOPES"
+        }
+      }
+    },
+    {
+      "kind": "component",
+      "name": "catalog-service",
+      "description": "Lists and searches books, shows book detail, and lets Store Staff manage the catalog.",
+      "wiring": {
+        "endpoint": {
+          "component": "p3-1004b-catalog-service",
+          "name": "http",
+          "visibility": "project",
+          "envBindings": {
+            "address": "CATALOG_SERVICE_URL"
+          }
+        }
+      }
+    },
+    {
+      "kind": "component",
+      "name": "customers-service",
+      "description": "Lets the signed-in Shopper manage their profile and shipping addresses.",
+      "wiring": {
+        "endpoint": {
+          "component": "p3-1004b-customers-service",
+          "name": "http",
+          "visibility": "project",
+          "envBindings": {
+            "address": "CUSTOMERS_SERVICE_URL"
+          }
+        }
+      }
+    },
+    {
+      "kind": "component",
+      "name": "cart-service",
+      "description": "Lets the signed-in Shopper manage their cart before checkout.",
+      "wiring": {
+        "endpoint": {
+          "component": "p3-1004b-cart-service",
+          "name": "http",
+          "visibility": "project",
+          "envBindings": {
+            "address": "CART_SERVICE_URL"
+          }
+        }
+      }
+    },
+    {
+      "kind": "component",
+      "name": "orders-service",
+      "description": "Checks out the Shopper's cart and shows their order history and status.",
+      "wiring": {
+        "endpoint": {
+          "component": "p3-1004b-orders-service",
+          "name": "http",
+          "visibility": "project",
+          "envBindings": {
+            "address": "ORDERS_SERVICE_URL"
+          }
+        }
+      }
+    },
+    {
+      "kind": "component",
+      "name": "inventory-service",
+      "description": "Shows stock availability and lets Store Staff adjust stock and view reservations.",
+      "wiring": {
+        "endpoint": {
+          "component": "p3-1004b-inventory-service",
+          "name": "http",
+          "visibility": "project",
+          "envBindings": {
+            "address": "INVENTORY_SERVICE_URL"
+          }
+        }
+      }
+    },
+    {
+      "kind": "component",
+      "name": "notifications-service",
+      "description": "Shows the signed-in Shopper's in-app order-status notifications.",
+      "wiring": {
+        "endpoint": {
+          "component": "p3-1004b-notifications-service",
+          "name": "http",
+          "visibility": "project",
+          "envBindings": {
+            "address": "NOTIFICATIONS_SERVICE_URL"
+          }
+        }
+      }
+    }
+  ],
+  "skillsPinned": [
+    "wireframes",
+    "react-webapp",
+    "oxygen-ui-design-system",
+    "thunder-authentication"
+  ]
 }

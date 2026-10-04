@@ -7,11 +7,51 @@
   "appPath": "catalog-service",
   "entrypoint": "deployment/service",
   "exposure": "internet",
-  "dependencies": [
-    { "kind": "platform-resource", "name": "user-auth", "resourceType": "thunder-app" },
-    { "kind": "component", "name": "inventory-service", "description": "Reads stock levels to show availability alongside book listings and detail pages." }
+  "stories": [
+    1,
+    2,
+    13
   ],
   "description": "Owns the book catalog: CRUD on books plus search/browse, backed by an in-memory store with no database. Book search and detail reads are public; creating, updating and removing books is restricted to Store Staff. Does not track stock levels or reservations — those belong to inventory-service.",
-  "stories": [1, 2, 13],
-  "skillsPinned": ["openapi-conventions", "go", "thunder-authentication", "api-management"]
+  "dependencies": [
+    {
+      "kind": "platform-resource",
+      "name": "user-auth",
+      "resourceType": "thunder-app",
+      "wiring": {
+        "ref": "p3-1004b-user-auth",
+        "envBindings": {
+          "client_id": "USER_AUTH_CLIENT_ID",
+          "issuer": "USER_AUTH_ISSUER",
+          "jwks_url": "USER_AUTH_JWKS_URL",
+          "resource": "USER_AUTH_RESOURCE",
+          "scopes": "USER_AUTH_SCOPES"
+        }
+      }
+    },
+    {
+      "kind": "component",
+      "name": "inventory-service",
+      "description": "Reads stock levels to show availability alongside book listings and detail pages.",
+      "wiring": {
+        "endpoint": {
+          "component": "p3-1004b-inventory-service",
+          "name": "http",
+          "visibility": "project",
+          "envBindings": {
+            "address": "INVENTORY_SERVICE_URL"
+          }
+        }
+      }
+    }
+  ],
+  "exposesAPI": {
+    "auth": "end-user-required"
+  },
+  "skillsPinned": [
+    "openapi-conventions",
+    "go",
+    "thunder-authentication",
+    "api-management"
+  ]
 }
