@@ -1,0 +1,16 @@
+{
+  "name": "inventory-service",
+  "type": "service",
+  "version": "0.1.0",
+  "language": "Go",
+  "buildpack": "docker",
+  "appPath": "inventory-service",
+  "entrypoint": "deployment/service",
+  "exposure": "internet",
+  "dependencies": [
+    { "kind": "platform-resource", "name": "user-auth", "resourceType": "thunder-app" }
+  ],
+  "description": "Owns stock levels and reservations for every book, backed by an in-memory store with no database. Reading stock levels is public, so the storefront can show availability to anonymous visitors; adjusting on-hand quantity is restricted to Store Staff; reserving/releasing stock against an order is called by orders-service during checkout. Does not own book metadata — that is catalog-service's.",
+  "stories": [2, 9, 14, 15],
+  "skillsPinned": ["openapi-conventions", "go", "thunder-authentication", "api-management"]
+}

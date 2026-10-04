@@ -1,0 +1,231 @@
+openapi: 3.0.3
+info:
+  title: Customers Service
+  version: 0.1.0
+  description: A signed-in Shopper's own account profile and shipping addresses.
+servers:
+  - url: /
+security:
+  - oauth2: []
+paths:
+  /me/profile:
+    get:
+      operationId: getMyProfile
+      summary: The caller's own profile
+      security:
+        - oauth2: [account:read]
+      responses:
+        '200':
+          description: The caller's profile
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Customer' }
+        '404':
+          description: No profile yet for the caller
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    put:
+      operationId: updateMyProfile
+      summary: Create or update the caller's own profile
+      security:
+        - oauth2: [account:manage]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CustomerInput' }
+      responses:
+        '200':
+          description: Profile saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Customer' }
+        '400':
+          description: Invalid profile data
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not signed in
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /me/addresses:
+    get:
+      operationId: listMyAddresses
+      summary: The caller's own shipping addresses
+      security:
+        - oauth2: [account:read]
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20, maximum: 100 }
+        - name: offset
+          in: query
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          description: The caller's addresses
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [count, data]
+                properties:
+                  count: { type: integer }
+                  next: { type: string, nullable: true }
+                  previous: { type: string, nullable: true }
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Address' }
+    post:
+      operationId: addMyAddress
+      summary: Add a shipping address for the caller
+      security:
+        - oauth2: [account:manage]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AddressInput' }
+      responses:
+        '201':
+          description: Address added
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Address' }
+        '400':
+          description: Invalid address data
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not signed in
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /me/addresses/{addressId}:
+    put:
+      operationId: updateMyAddress
+      summary: Update one of the caller's own addresses
+      security:
+        - oauth2: [account:manage]
+      parameters:
+        - name: addressId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AddressInput' }
+      responses:
+        '200':
+          description: Address updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Address' }
+        '400':
+          description: Invalid address data
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not signed in
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: No such address for the caller
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    delete:
+      operationId: removeMyAddress
+      summary: Remove one of the caller's own addresses
+      security:
+        - oauth2: [account:manage]
+      parameters:
+        - name: addressId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '204':
+          description: Address removed
+        '401':
+          description: Not signed in
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: No such address for the caller
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /health:
+    get:
+      operationId: getHealth
+      summary: Liveness check
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+components:
+  securitySchemes:
+    oauth2:
+      type: oauth2
+      flows:
+        authorizationCode:
+          authorizationUrl: /oauth2/authorize
+          tokenUrl: /oauth2/token
+          scopes:
+            account:read: The caller's own profile and addresses
+            account:manage: Create, update and remove the caller's own profile and addresses
+  schemas:
+    Customer:
+      type: object
+      required: [id, name, email]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        email: { type: string }
+    CustomerInput:
+      type: object
+      required: [name, email]
+      properties:
+        name: { type: string }
+        email: { type: string }
+    Address:
+      type: object
+      required: [id, line1, city, region, postalCode, country]
+      properties:
+        id: { type: string }
+        line1: { type: string }
+        line2: { type: string }
+        city: { type: string }
+        region: { type: string }
+        postalCode: { type: string }
+        country: { type: string }
+        isDefault: { type: boolean }
+    AddressInput:
+      type: object
+      required: [line1, city, region, postalCode, country]
+      properties:
+        line1: { type: string }
+        line2: { type: string }
+        city: { type: string }
+        region: { type: string }
+        postalCode: { type: string }
+        country: { type: string }
+        isDefault: { type: boolean }
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: integer }
+        message: { type: string }
+        description: { type: string }
+        moreInfo: { type: string }

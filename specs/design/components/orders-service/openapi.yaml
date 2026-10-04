@@ -1,0 +1,138 @@
+openapi: 3.0.3
+info:
+  title: Orders Service
+  version: 0.1.0
+  description: Checkout and order history for the caller's own orders.
+servers:
+  - url: /
+security:
+  - oauth2: []
+paths:
+  /me/orders:
+    get:
+      operationId: listMyOrders
+      summary: The caller's own past orders
+      security:
+        - oauth2: [orders:read]
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20, maximum: 100 }
+        - name: offset
+          in: query
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          description: The caller's orders
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [count, data]
+                properties:
+                  count: { type: integer }
+                  next: { type: string, nullable: true }
+                  previous: { type: string, nullable: true }
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Order' }
+    post:
+      operationId: checkout
+      summary: Check out the caller's cart into a new order
+      security:
+        - oauth2: [orders:create]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [addressId, paymentMethodRef]
+              properties:
+                addressId: { type: string }
+                paymentMethodRef: { type: string }
+      responses:
+        '201':
+          description: Order placed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+        '400':
+          description: One or more items in the cart are out of stock
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not signed in
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /me/orders/{orderId}:
+    get:
+      operationId: getMyOrder
+      summary: One of the caller's own orders
+      security:
+        - oauth2: [orders:read]
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: The order
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+        '404':
+          description: No such order for the caller
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /health:
+    get:
+      operationId: getHealth
+      summary: Liveness check
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+components:
+  securitySchemes:
+    oauth2:
+      type: oauth2
+      flows:
+        authorizationCode:
+          authorizationUrl: /oauth2/authorize
+          tokenUrl: /oauth2/token
+          scopes:
+            orders:read: The caller's own orders and their status
+            orders:create: Check out the caller's cart into a new order
+  schemas:
+    OrderItem:
+      type: object
+      required: [bookId, quantity, unitPrice]
+      properties:
+        bookId: { type: string }
+        quantity: { type: integer }
+        unitPrice: { type: number }
+    Order:
+      type: object
+      required: [id, status, total, items, placedAt]
+      properties:
+        id: { type: string }
+        status: { type: string, enum: [placed, confirmed, shipped, delivered, cancelled] }
+        total: { type: number }
+        addressId: { type: string }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/OrderItem' }
+        placedAt: { type: string }
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: integer }
+        message: { type: string }
+        description: { type: string }
+        moreInfo: { type: string }

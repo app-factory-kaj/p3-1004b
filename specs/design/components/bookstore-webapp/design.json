@@ -1,0 +1,22 @@
+{
+  "name": "bookstore-webapp",
+  "type": "web-application",
+  "version": "0.1.0",
+  "language": "TypeScript",
+  "buildpack": "docker",
+  "appPath": "bookstore-webapp",
+  "entrypoint": "deployment/web-application",
+  "exposure": "internet",
+  "dependencies": [
+    { "kind": "platform-resource", "name": "user-auth", "resourceType": "thunder-app" },
+    { "kind": "component", "name": "catalog-service", "description": "Lists and searches books, shows book detail, and lets Store Staff manage the catalog." },
+    { "kind": "component", "name": "customers-service", "description": "Lets the signed-in Shopper manage their profile and shipping addresses." },
+    { "kind": "component", "name": "cart-service", "description": "Lets the signed-in Shopper manage their cart before checkout." },
+    { "kind": "component", "name": "orders-service", "description": "Checks out the Shopper's cart and shows their order history and status." },
+    { "kind": "component", "name": "inventory-service", "description": "Shows stock availability and lets Store Staff adjust stock and view reservations." },
+    { "kind": "component", "name": "notifications-service", "description": "Shows the signed-in Shopper's in-app order-status notifications." }
+  ],
+  "description": "The React storefront SPA: public catalog browsing and search, Shopper account/cart/checkout/order-history/notifications screens behind sign-in, and a Store Staff area for catalog and inventory management. Holds no business data itself — every screen is backed by one of the six services.",
+  "stories": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+  "skillsPinned": ["wireframes", "react-webapp", "oxygen-ui-design-system", "thunder-authentication"]
+}

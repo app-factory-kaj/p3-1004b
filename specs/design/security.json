@@ -1,0 +1,83 @@
+{
+  "version": 3,
+  "permissions": [
+    {
+      "resource": "books",
+      "component": "catalog-service",
+      "description": "Catalog of books",
+      "actions": [
+        { "handle": "manage", "description": "Create, update and remove books" }
+      ]
+    },
+    {
+      "resource": "stock",
+      "component": "inventory-service",
+      "description": "Stock levels and reservations for books",
+      "actions": [
+        { "handle": "manage", "description": "Adjust on-hand quantity for any book" },
+        { "handle": "reserve", "description": "Reserve or release stock for an order being checked out" },
+        { "handle": "view-reservations", "description": "View every current reservation" }
+      ]
+    },
+    {
+      "resource": "account",
+      "component": "customers-service",
+      "description": "The caller's own profile and shipping addresses",
+      "actions": [
+        { "handle": "read", "description": "The caller's own profile and addresses" },
+        { "handle": "manage", "description": "Create, update and remove the caller's own profile and addresses" }
+      ]
+    },
+    {
+      "resource": "cart",
+      "component": "cart-service",
+      "description": "The caller's own shopping cart",
+      "actions": [
+        { "handle": "read", "description": "The caller's own cart" },
+        { "handle": "manage", "description": "Add, update and remove the caller's own cart items" }
+      ]
+    },
+    {
+      "resource": "orders",
+      "component": "orders-service",
+      "description": "The caller's own orders",
+      "actions": [
+        { "handle": "read", "description": "The caller's own orders and their status" },
+        { "handle": "create", "description": "Check out the caller's cart into a new order" }
+      ]
+    },
+    {
+      "resource": "notifications",
+      "component": "notifications-service",
+      "description": "The caller's own order-status notifications",
+      "actions": [
+        { "handle": "read", "description": "The caller's own notifications" },
+        { "handle": "create", "description": "Create a notification when an order's status changes" }
+      ]
+    }
+  ],
+  "groups": [
+    { "name": "Store Staff", "description": "Bookstore employees who manage the catalog and inventory" }
+  ],
+  "roles": [
+    {
+      "name": "Shopper",
+      "description": "Browses the catalog as a guest, and once signed in manages their own account, cart, orders and notifications.",
+      "stories": [3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+      "grants": ["account:read", "account:manage", "cart:read", "cart:manage", "orders:read", "orders:create", "notifications:read", "notifications:create", "stock:reserve"],
+      "enrolment": "self-service"
+    },
+    {
+      "name": "StoreStaffRole",
+      "description": "Manages the book catalog and stock levels.",
+      "stories": [13, 14, 15],
+      "grants": ["books:manage", "stock:manage", "stock:view-reservations"],
+      "assignTo": ["Store Staff"]
+    }
+  ],
+  "testUsers": [
+    { "username": "test-shopper", "roles": ["Shopper"] },
+    { "username": "test-shopper-two", "roles": ["Shopper"] },
+    { "username": "test-store-staff", "roles": ["StoreStaffRole"] }
+  ]
+}

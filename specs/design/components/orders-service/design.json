@@ -1,0 +1,20 @@
+{
+  "name": "orders-service",
+  "type": "service",
+  "version": "0.1.0",
+  "language": "Go",
+  "buildpack": "docker",
+  "appPath": "orders-service",
+  "entrypoint": "deployment/service",
+  "exposure": "internet",
+  "dependencies": [
+    { "kind": "platform-resource", "name": "user-auth", "resourceType": "thunder-app" },
+    { "kind": "component", "name": "cart-service", "description": "Reads the caller's cart contents to build the order at checkout, then clears the cart." },
+    { "kind": "component", "name": "inventory-service", "description": "Reserves stock for each line item at checkout and releases it if checkout fails." },
+    { "kind": "component", "name": "customers-service", "description": "Reads the caller's default shipping address to attach to the order." },
+    { "kind": "component", "name": "notifications-service", "description": "Creates an in-app notification whenever an order's status changes." }
+  ],
+  "description": "Owns checkout and order history, backed by an in-memory store with no database. Checkout turns the caller's cart into an order, simulating payment (no real payment gateway is called) and reserving stock; every read is scoped to the caller's own orders under /me. Does not manage cart contents or stock levels directly — it calls cart-service and inventory-service for those.",
+  "stories": [8, 9, 10, 11],
+  "skillsPinned": ["openapi-conventions", "go", "thunder-authentication", "api-management"]
+}

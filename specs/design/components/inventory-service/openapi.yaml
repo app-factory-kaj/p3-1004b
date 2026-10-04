@@ -1,0 +1,225 @@
+openapi: 3.0.3
+info:
+  title: Inventory Service
+  version: 0.1.0
+  description: Stock levels and reservations for every book.
+servers:
+  - url: /
+security:
+  - oauth2: []
+paths:
+  /stock-levels:
+    get:
+      operationId: listStockLevels
+      summary: Stock levels for every book
+      security: []
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20, maximum: 100 }
+        - name: offset
+          in: query
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          description: Stock levels
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [count, data]
+                properties:
+                  count: { type: integer }
+                  next: { type: string, nullable: true }
+                  previous: { type: string, nullable: true }
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/StockLevel' }
+  /stock-levels/{bookId}:
+    get:
+      operationId: getStockLevel
+      summary: Stock level for one book
+      security: []
+      parameters:
+        - name: bookId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: The stock level
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockLevel' }
+        '404':
+          description: No stock record for this book
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    put:
+      operationId: setStockLevel
+      summary: Set the on-hand quantity for a book
+      security:
+        - oauth2: [stock:manage]
+      parameters:
+        - name: bookId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quantityOnHand]
+              properties:
+                quantityOnHand: { type: integer, minimum: 0 }
+      responses:
+        '200':
+          description: Stock level updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockLevel' }
+        '400':
+          description: Invalid quantity
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not signed in
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /reservations:
+    get:
+      operationId: listReservations
+      summary: Every current reservation
+      security:
+        - oauth2: [stock:view-reservations]
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20, maximum: 100 }
+        - name: offset
+          in: query
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          description: Reservations
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [count, data]
+                properties:
+                  count: { type: integer }
+                  next: { type: string, nullable: true }
+                  previous: { type: string, nullable: true }
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Reservation' }
+    post:
+      operationId: reserveStock
+      summary: Reserve stock for an order being checked out
+      security:
+        - oauth2: [stock:reserve]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [bookId, orderId, quantity]
+              properties:
+                bookId: { type: string }
+                orderId: { type: string }
+                quantity: { type: integer, minimum: 1 }
+      responses:
+        '201':
+          description: Stock reserved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Reservation' }
+        '400':
+          description: Insufficient stock or invalid request
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not signed in
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /reservations/{reservationId}/release:
+    post:
+      operationId: releaseReservation
+      summary: Release a reservation back into stock
+      security:
+        - oauth2: [stock:reserve]
+      parameters:
+        - name: reservationId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Reservation released
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Reservation' }
+        '401':
+          description: Not signed in
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: No such reservation
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /health:
+    get:
+      operationId: getHealth
+      summary: Liveness check
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+components:
+  securitySchemes:
+    oauth2:
+      type: oauth2
+      flows:
+        authorizationCode:
+          authorizationUrl: /oauth2/authorize
+          tokenUrl: /oauth2/token
+          scopes:
+            stock:manage: Adjust on-hand quantity for any book
+            stock:reserve: Reserve or release stock for an order
+            stock:view-reservations: View every current reservation
+  schemas:
+    StockLevel:
+      type: object
+      required: [bookId, quantityOnHand, quantityReserved]
+      properties:
+        bookId: { type: string }
+        quantityOnHand: { type: integer }
+        quantityReserved: { type: integer }
+    Reservation:
+      type: object
+      required: [id, bookId, orderId, quantity, status]
+      properties:
+        id: { type: string }
+        bookId: { type: string }
+        orderId: { type: string }
+        quantity: { type: integer }
+        status: { type: string, enum: [held, released] }
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: integer }
+        message: { type: string }
+        description: { type: string }
+        moreInfo: { type: string }

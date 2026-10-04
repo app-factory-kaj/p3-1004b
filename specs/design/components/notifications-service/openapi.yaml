@@ -1,0 +1,130 @@
+openapi: 3.0.3
+info:
+  title: Notifications Service
+  version: 0.1.0
+  description: In-app order-status notifications for the caller.
+servers:
+  - url: /
+security:
+  - oauth2: []
+paths:
+  /me/notifications:
+    get:
+      operationId: listMyNotifications
+      summary: The caller's own notifications
+      security:
+        - oauth2: [notifications:read]
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20, maximum: 100 }
+        - name: offset
+          in: query
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          description: The caller's notifications
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [count, data]
+                properties:
+                  count: { type: integer }
+                  next: { type: string, nullable: true }
+                  previous: { type: string, nullable: true }
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Notification' }
+  /me/notifications/{notificationId}/read:
+    post:
+      operationId: markMyNotificationRead
+      summary: Mark one of the caller's notifications as read
+      security:
+        - oauth2: [notifications:read]
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Notification updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Notification' }
+        '401':
+          description: Not signed in
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: No such notification for the caller
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /notifications:
+    post:
+      operationId: createNotification
+      summary: Create a notification for a customer when their order status changes
+      security:
+        - oauth2: [notifications:create]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [customerId, orderId, message]
+              properties:
+                customerId: { type: string }
+                orderId: { type: string }
+                message: { type: string }
+      responses:
+        '201':
+          description: Notification created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Notification' }
+        '400':
+          description: Invalid notification data
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /health:
+    get:
+      operationId: getHealth
+      summary: Liveness check
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+components:
+  securitySchemes:
+    oauth2:
+      type: oauth2
+      flows:
+        authorizationCode:
+          authorizationUrl: /oauth2/authorize
+          tokenUrl: /oauth2/token
+          scopes:
+            notifications:read: The caller's own notifications
+            notifications:create: Create a notification when an order's status changes
+  schemas:
+    Notification:
+      type: object
+      required: [id, orderId, message, read, createdAt]
+      properties:
+        id: { type: string }
+        orderId: { type: string }
+        message: { type: string }
+        read: { type: boolean }
+        createdAt: { type: string }
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: integer }
+        message: { type: string }
+        description: { type: string }
+        moreInfo: { type: string }

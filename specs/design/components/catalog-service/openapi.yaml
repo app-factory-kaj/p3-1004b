@@ -1,0 +1,202 @@
+openapi: 3.0.3
+info:
+  title: Catalog Service
+  version: 0.1.0
+  description: Books CRUD and search for the bookstore platform.
+servers:
+  - url: /
+security:
+  - oauth2: []
+paths:
+  /books:
+    get:
+      operationId: listBooks
+      summary: Search and browse every book
+      security: []
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string }
+          description: Free-text search over title, author and description
+        - name: tag
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20, maximum: 100 }
+        - name: offset
+          in: query
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          description: Matching books
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [count, data]
+                properties:
+                  count: { type: integer, description: total matching items }
+                  next: { type: string, nullable: true }
+                  previous: { type: string, nullable: true }
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Book' }
+    post:
+      operationId: createBook
+      summary: Create a book
+      security:
+        - oauth2: [books:manage]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BookInput' }
+      responses:
+        '201':
+          description: Book created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Book' }
+        '400':
+          description: Invalid book data
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not signed in
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /books/{bookId}:
+    get:
+      operationId: getBook
+      summary: Book details
+      security: []
+      parameters:
+        - name: bookId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: The book
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Book' }
+        '404':
+          description: No such book
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    put:
+      operationId: updateBook
+      summary: Update a book
+      security:
+        - oauth2: [books:manage]
+      parameters:
+        - name: bookId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BookInput' }
+      responses:
+        '200':
+          description: Book updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Book' }
+        '400':
+          description: Invalid book data
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not signed in
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: No such book
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    delete:
+      operationId: deleteBook
+      summary: Remove a book
+      security:
+        - oauth2: [books:manage]
+      parameters:
+        - name: bookId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '204':
+          description: Book removed
+        '401':
+          description: Not signed in
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: No such book
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /health:
+    get:
+      operationId: getHealth
+      summary: Liveness check
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+components:
+  securitySchemes:
+    oauth2:
+      type: oauth2
+      flows:
+        authorizationCode:
+          authorizationUrl: /oauth2/authorize
+          tokenUrl: /oauth2/token
+          scopes:
+            books:manage: Create, update and remove books
+  schemas:
+    Book:
+      type: object
+      required: [id, title, author, price]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        author: { type: string }
+        isbn: { type: string }
+        description: { type: string }
+        price: { type: number }
+        tags:
+          type: array
+          items: { type: string }
+    BookInput:
+      type: object
+      required: [title, author, price]
+      properties:
+        title: { type: string }
+        author: { type: string }
+        isbn: { type: string }
+        description: { type: string }
+        price: { type: number }
+        tags:
+          type: array
+          items: { type: string }
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: integer }
+        message: { type: string }
+        description: { type: string }
+        moreInfo: { type: string }

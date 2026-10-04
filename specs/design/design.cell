@@ -1,0 +1,38 @@
+title Online Bookstore Platform
+
+component bookstore-webapp as "Bookstore Storefront" web-application
+component catalog-service as "Catalog Service" service
+component customers-service as "Customers Service" service
+component cart-service as "Cart Service" service
+component orders-service as "Orders Service" service
+component inventory-service as "Inventory Service" service
+component notifications-service as "Notifications Service" service
+
+east user-auth as "Thunder Auth" identity-server
+
+north -> bookstore-webapp
+
+bookstore-webapp -> catalog-service
+bookstore-webapp -> customers-service
+bookstore-webapp -> cart-service
+bookstore-webapp -> orders-service
+bookstore-webapp -> inventory-service
+bookstore-webapp -> notifications-service
+bookstore-webapp -> user-auth
+
+catalog-service -> user-auth
+catalog-service -> inventory-service
+
+customers-service -> user-auth
+
+cart-service -> user-auth
+
+orders-service -> user-auth
+orders-service -> cart-service
+orders-service -> inventory-service
+orders-service -> customers-service
+orders-service -> notifications-service
+
+inventory-service -> user-auth
+
+notifications-service -> user-auth

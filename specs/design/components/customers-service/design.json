@@ -1,0 +1,16 @@
+{
+  "name": "customers-service",
+  "type": "service",
+  "version": "0.1.0",
+  "language": "Go",
+  "buildpack": "docker",
+  "appPath": "customers-service",
+  "entrypoint": "deployment/service",
+  "exposure": "internet",
+  "dependencies": [
+    { "kind": "platform-resource", "name": "user-auth", "resourceType": "thunder-app" }
+  ],
+  "description": "Owns each signed-in Shopper's account profile and shipping addresses, backed by an in-memory store with no database. Every operation is scoped to the caller's own profile and addresses under /me — there is no every-row view, since this is personal account data. Does not handle sign-in itself; that is Thunder's job.",
+  "stories": [3, 4, 5],
+  "skillsPinned": ["openapi-conventions", "go", "thunder-authentication", "api-management"]
+}

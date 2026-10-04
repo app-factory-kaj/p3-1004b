@@ -1,0 +1,17 @@
+{
+  "name": "catalog-service",
+  "type": "service",
+  "version": "0.1.0",
+  "language": "Go",
+  "buildpack": "docker",
+  "appPath": "catalog-service",
+  "entrypoint": "deployment/service",
+  "exposure": "internet",
+  "dependencies": [
+    { "kind": "platform-resource", "name": "user-auth", "resourceType": "thunder-app" },
+    { "kind": "component", "name": "inventory-service", "description": "Reads stock levels to show availability alongside book listings and detail pages." }
+  ],
+  "description": "Owns the book catalog: CRUD on books plus search/browse, backed by an in-memory store with no database. Book search and detail reads are public; creating, updating and removing books is restricted to Store Staff. Does not track stock levels or reservations — those belong to inventory-service.",
+  "stories": [1, 2, 13],
+  "skillsPinned": ["openapi-conventions", "go", "thunder-authentication", "api-management"]
+}

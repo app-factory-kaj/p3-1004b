@@ -1,0 +1,178 @@
+openapi: 3.0.3
+info:
+  title: Cart Service
+  version: 0.1.0
+  description: A signed-in Shopper's own cart.
+servers:
+  - url: /
+security:
+  - oauth2: []
+paths:
+  /me/cart:
+    get:
+      operationId: getMyCart
+      summary: The caller's own cart
+      security:
+        - oauth2: [cart:read]
+      responses:
+        '200':
+          description: The caller's cart
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Cart' }
+    delete:
+      operationId: clearMyCart
+      summary: Empty the caller's own cart
+      security:
+        - oauth2: [cart:manage]
+      responses:
+        '204':
+          description: Cart cleared
+        '401':
+          description: Not signed in
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /me/cart/items:
+    post:
+      operationId: addMyCartItem
+      summary: Add a book to the caller's own cart
+      security:
+        - oauth2: [cart:manage]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [bookId, quantity]
+              properties:
+                bookId: { type: string }
+                quantity: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: Item added
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Cart' }
+        '400':
+          description: Invalid item
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not signed in
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /me/cart/items/{bookId}:
+    put:
+      operationId: updateMyCartItem
+      summary: Change the quantity of a book in the caller's own cart
+      security:
+        - oauth2: [cart:manage]
+      parameters:
+        - name: bookId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quantity]
+              properties:
+                quantity: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: Item updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Cart' }
+        '400':
+          description: Invalid quantity
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not signed in
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: No such item in the caller's cart
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    delete:
+      operationId: removeMyCartItem
+      summary: Remove a book from the caller's own cart
+      security:
+        - oauth2: [cart:manage]
+      parameters:
+        - name: bookId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Item removed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Cart' }
+        '401':
+          description: Not signed in
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: No such item in the caller's cart
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /health:
+    get:
+      operationId: getHealth
+      summary: Liveness check
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+components:
+  securitySchemes:
+    oauth2:
+      type: oauth2
+      flows:
+        authorizationCode:
+          authorizationUrl: /oauth2/authorize
+          tokenUrl: /oauth2/token
+          scopes:
+            cart:read: The caller's own cart
+            cart:manage: Add, update and remove the caller's own cart items
+  schemas:
+    CartItem:
+      type: object
+      required: [bookId, quantity]
+      properties:
+        bookId: { type: string }
+        quantity: { type: integer }
+    Cart:
+      type: object
+      required: [id, items, subtotal]
+      properties:
+        id: { type: string }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/CartItem' }
+        subtotal: { type: number }
+        updatedAt: { type: string }
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: integer }
+        message: { type: string }
+        description: { type: string }
+        moreInfo: { type: string }

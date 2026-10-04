@@ -1,0 +1,16 @@
+{
+  "name": "notifications-service",
+  "type": "service",
+  "version": "0.1.0",
+  "language": "Go",
+  "buildpack": "docker",
+  "appPath": "notifications-service",
+  "entrypoint": "deployment/service",
+  "exposure": "internet",
+  "dependencies": [
+    { "kind": "platform-resource", "name": "user-auth", "resourceType": "thunder-app" }
+  ],
+  "description": "Owns in-app order-status notifications, backed by an in-memory store with no database. Every read is scoped to the caller's own notifications under /me; notifications are created by orders-service when an order's status changes. Does not send email or SMS — delivery is in-app only.",
+  "stories": [12],
+  "skillsPinned": ["openapi-conventions", "go", "thunder-authentication", "api-management"]
+}

@@ -1,0 +1,16 @@
+{
+  "name": "cart-service",
+  "type": "service",
+  "version": "0.1.0",
+  "language": "Go",
+  "buildpack": "docker",
+  "appPath": "cart-service",
+  "entrypoint": "deployment/service",
+  "exposure": "internet",
+  "dependencies": [
+    { "kind": "platform-resource", "name": "user-auth", "resourceType": "thunder-app" }
+  ],
+  "description": "Owns each signed-in Shopper's own cart: add/remove/update line items and read the current cart and subtotal, backed by an in-memory store with no database, one cart per customer. Every operation is scoped to the caller's own cart under /me. Does not perform checkout — orders-service reads the cart to create an order and then clears it.",
+  "stories": [6, 7],
+  "skillsPinned": ["openapi-conventions", "go", "thunder-authentication", "api-management"]
+}
