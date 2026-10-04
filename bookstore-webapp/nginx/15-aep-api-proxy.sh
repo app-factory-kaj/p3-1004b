@@ -68,15 +68,24 @@ echo "aep-api-proxy: /api -> ${API_BACKEND}${API_CONTEXT}  [${API_LANE}]"
 sed -i "s|__API_BACKEND__|${API_BACKEND}|g" "$CONF"
 sed -i "s|__API_CONTEXT__|${API_CONTEXT}|g" "$CONF"
 
-# Extra siblings (all `visibility: project`, so no gateway lane — direct
-# Service address only): customers-service, cart-service, orders-service,
-# inventory-service, notifications-service. Each gets its own backend/context
+# Extra siblings: customers-service, cart-service, orders-service,
+# inventory-service, notifications-service. Every one of them declares
+# `exposesAPI.auth`, so the platform injects a <DEP>_GATEWAY_URL for each
+# alongside its direct <DEP>_URL — same two lanes as the primary above, and
+# the same preference: the gateway validates the bearer token and injects
+# identity; the direct Service does neither. Each gets its own backend/context
 # pair substituted into nginx/default.conf's matching location block.
 set_extra_backend() {
     name="$1"
-    url_var="$2"
-    placeholder="$3"
-    url="$(eval echo "\${$url_var:-}")"
+    gateway_url_var="$2"
+    url_var="$3"
+    placeholder="$4"
+    url="$(eval echo "\${$gateway_url_var:-}")"
+    lane="gateway (token validated, identity injected)"
+    if [ -z "$url" ]; then
+        url="$(eval echo "\${$url_var:-}")"
+        lane="direct Service (NO token validation)"
+    fi
     backend="$(echo "${url}" | sed -e 's|^https\{0,1\}://||' -e 's|/.*$||')"
     context="$(echo "${url}" | sed -e 's|^https\{0,1\}://[^/]*||' -e 's|/$||')"
     if [ -z "$backend" ]; then
@@ -84,14 +93,14 @@ set_extra_backend() {
         backend="127.0.0.1:9"
         context=""
     else
-        echo "aep-api-proxy: /api/${name}/ -> ${backend}${context}"
+        echo "aep-api-proxy: /api/${name}/ -> ${backend}${context}  [${lane}]"
     fi
     sed -i "s|__${placeholder}_BACKEND__|${backend}|g" "$CONF"
     sed -i "s|__${placeholder}_CONTEXT__|${context}|g" "$CONF"
 }
 
-set_extra_backend "customers-service" "CUSTOMERS_SERVICE_URL" "CUSTOMERS_SERVICE"
-set_extra_backend "cart-service" "CART_SERVICE_URL" "CART_SERVICE"
-set_extra_backend "orders-service" "ORDERS_SERVICE_URL" "ORDERS_SERVICE"
-set_extra_backend "inventory-service" "INVENTORY_SERVICE_URL" "INVENTORY_SERVICE"
-set_extra_backend "notifications-service" "NOTIFICATIONS_SERVICE_URL" "NOTIFICATIONS_SERVICE"
+set_extra_backend "customers-service" "CUSTOMERS_SERVICE_GATEWAY_URL" "CUSTOMERS_SERVICE_URL" "CUSTOMERS_SERVICE"
+set_extra_backend "cart-service" "CART_SERVICE_GATEWAY_URL" "CART_SERVICE_URL" "CART_SERVICE"
+set_extra_backend "orders-service" "ORDERS_SERVICE_GATEWAY_URL" "ORDERS_SERVICE_URL" "ORDERS_SERVICE"
+set_extra_backend "inventory-service" "INVENTORY_SERVICE_GATEWAY_URL" "INVENTORY_SERVICE_URL" "INVENTORY_SERVICE"
+set_extra_backend "notifications-service" "NOTIFICATIONS_SERVICE_GATEWAY_URL" "NOTIFICATIONS_SERVICE_URL" "NOTIFICATIONS_SERVICE"
